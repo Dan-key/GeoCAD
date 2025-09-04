@@ -13,8 +13,11 @@ set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} "${CMAKE_SOURCE_DIR}/CMake")
 include("GenerateQrc")
 
 find_package(Qt6 REQUIRED COMPONENTS Core Qml Quick)
+find_package(Vulkan REQUIRED)
 
-file(GLOB SOURCES "*.cpp")
+file(GLOB_RECURSE SOURCES "src/*.cpp")
+
+message(STATUS ${SOURCES})
 
 set(QRC_NAME ${PROJECT_NAME}.qrc)
 set(QRC_FILENAME ${CMAKE_CURRENT_BINARY_DIR}/${QRC_NAME})
@@ -24,4 +27,7 @@ GenerateQrc(${QRC_NAME} "/" ${CMAKE_CURRENT_BINARY_DIR})
 
 add_executable(${PROJECT_NAME} ${SOURCES} ${QRC_FILENAME})
 
-target_link_libraries(${PROJECT_NAME} Qt6::Core Qt6::Qml Qt6::Quick)
+target_link_libraries(${PROJECT_NAME} Qt6::Core Qt6::Qml Qt6::Quick Vulkan::Vulkan)
+target_include_directories(${PROJECT_NAME} PRIVATE
+    ${Vulkan_INCLUDE_DIRS}
+)
