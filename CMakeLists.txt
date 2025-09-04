@@ -1,20 +1,27 @@
 cmake_minimum_required(VERSION 3.11)
 
 set(PROJECT_NAME GeoCAD)
-
 project(${PROJECT_NAME})
-
 set(CMAKE_CXX_STANDARD 20)
 
-find_package(Qt6 REQUIRED COMPONENTS Core Widgets)
+set(CMAKE_AUTOMOC ON)
+set(CMAKE_AUTORCC ON)
+set(CMAKE_AUTOUIC ON)
+
+set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} "${CMAKE_SOURCE_DIR}/CMake")
+
+include("GenerateQrc")
+
+find_package(Qt6 REQUIRED COMPONENTS Core Qml Quick)
 
 file(GLOB SOURCES "*.cpp")
 
-set(RESOURCE_FILES resources.qrc)
+set(QRC_NAME ${PROJECT_NAME}.qrc)
+set(QRC_FILENAME ${CMAKE_CURRENT_BINARY_DIR}/${QRC_NAME})
 
-add_executable(${PROJECT_NAME} ${SOURCES} ${RESOURCE_FILES})
+# Build
+GenerateQrc(${QRC_NAME} "/" ${CMAKE_CURRENT_BINARY_DIR})
 
-target_link_libraries(${PROJECT_NAME} Qt6::Core Qt6::Widgets)
-qt6_add_resources(${PROJECT_NAME} "resources" PREFIX "/"
-    FILES ${RESOURCE_FILES}
-)
+add_executable(${PROJECT_NAME} ${SOURCES} ${QRC_FILENAME})
+
+target_link_libraries(${PROJECT_NAME} Qt6::Core Qt6::Qml Qt6::Quick)
