@@ -5,7 +5,7 @@
 #include <QVulkanFunctions>
 #include <QSGTexture>
 #include <QTimer>
-#include <QDebug>
+#include <vulkan/vulkan.h>
 
 class VulkanRenderer : public QVulkanWindowRenderer
 {
@@ -72,7 +72,7 @@ void VulkanRenderer::startNextFrame()
     rpBeginInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
     rpBeginInfo.renderPass = m_window->defaultRenderPass();
     rpBeginInfo.framebuffer = m_window->currentFramebuffer();
-    
+
     const QSize size = m_window->swapChainImageSize();
     rpBeginInfo.renderArea.extent.width = size.width();
     rpBeginInfo.renderArea.extent.height = size.height();
@@ -81,10 +81,10 @@ void VulkanRenderer::startNextFrame()
 
     VkCommandBuffer cmdBuf = m_window->currentCommandBuffer();
     m_devFuncs->vkCmdBeginRenderPass(cmdBuf, &rpBeginInfo, VK_SUBPASS_CONTENTS_INLINE);
-    
+
     // Here you would add your Vulkan drawing commands
     // For now, we just clear to a blue color
-    
+
     m_devFuncs->vkCmdEndRenderPass(cmdBuf);
 
     // Create a QImage representation for Qt integration
@@ -125,29 +125,29 @@ VulkanItem::VulkanItem(QQuickItem *parent)
     : QQuickItem(parent)
 {
     setFlag(ItemHasContents, true);
-    
-    qDebug() << "VulkanItem constructor";
-    
+
+    qDebug() << "VulkanItem constructor, parent"  << parent;
+
     // Setup Vulkan instance
-    m_instance.setApiVersion(QVersionNumber(1, 0, 0));
-    
+    m_instance.setApiVersion(QVersionNumber(1, 3, 275));
+
     // Enable validation layers in debug mode
-#ifdef QT_DEBUG
-    m_instance.setLayers(QByteArrayList() << "VK_LAYER_KHRONOS_validation");
+#ifndef NDEBUG
+    m_instance.setLayers(QByteArrayList() << "VK_LAYER_NV_optimus");
 #endif
-    
+
     if (!m_instance.create()) {
         qWarning("Failed to create Vulkan instance: error code %d", m_instance.errorCode());
         return;
     }
-    
+
     qDebug() << "Vulkan instance created successfully";
-    
+
     // Setup update timer for continuous rendering
     m_updateTimer = new QTimer(this);
     m_updateTimer->setInterval(16); // ~60 FPS
     connect(m_updateTimer, &QTimer::timeout, this, &VulkanItem::updateTexture);
-    
+
     // Connect to window changes
     connect(this, &QQuickItem::windowChanged, this, &VulkanItem::handleWindowChanged);
 }
@@ -155,11 +155,11 @@ VulkanItem::VulkanItem(QQuickItem *parent)
 VulkanItem::~VulkanItem()
 {
     qDebug() << "VulkanItem destructor";
-    
+
     if (m_updateTimer) {
         m_updateTimer->stop();
     }
-    
+
     if (m_vulkanWindow) {
         delete m_vulkanWindow;
         m_vulkanWindow = nullptr;
@@ -171,23 +171,25 @@ void VulkanItem::setupVulkanWindow()
     if (m_vulkanWindow || !m_instance.isValid()) {
         return;
     }
-    
+
     qDebug() << "Setting up Vulkan window";
-    
+
     m_vulkanWindow = new VulkanWindow();
     m_vulkanWindow->setVulkanInstance(&m_instance);
-    
+
     // Set size
     QSize size = boundingRect().size().toSize();
     if (size.isEmpty()) {
         size = QSize(512, 512);
     }
-    
+
+    qDebug() << "size:" << size;
+
     m_vulkanWindow->resize(size);
-    
+
     // Create the window
     m_vulkanWindow->create();
-    
+
     if (m_vulkanWindow->isValid()) {
         qDebug() << "Vulkan window created successfully";
         m_vulkanInitialized = true;
@@ -218,9 +220,9 @@ void VulkanItem::updateTexture()
 QSGNode *VulkanItem::updatePaintNode(QSGNode *node, UpdatePaintNodeData *data)
 {
     Q_UNUSED(data);
-    
+
     QSGSimpleTextureNode *textureNode = static_cast<QSGSimpleTextureNode *>(node);
-    
+
     if (!textureNode) {
         textureNode = new QSGSimpleTextureNode();
         textureNode->setFiltering(QSGTexture::Linear);
@@ -231,11 +233,11 @@ QSGNode *VulkanItem::updatePaintNode(QSGNode *node, UpdatePaintNodeData *data)
             setupVulkanWindow();
         }
     }
-    
+
     // Update texture if we have valid Vulkan rendering
     if (m_vulkanWindow && m_vulkanWindow->isValid() && window()) {
         QImage renderedImage = m_vulkanWindow->getRenderedImage();
-        
+
         if (!renderedImage.isNull()) {
             QSGTexture *texture = window()->createTextureFromImage(renderedImage);
             if (texture) {
@@ -244,13 +246,13 @@ QSGNode *VulkanItem::updatePaintNode(QSGNode *node, UpdatePaintNodeData *data)
                 if (oldTexture && textureNode->ownsTexture()) {
                     delete oldTexture;
                 }
-                
+
                 textureNode->setTexture(texture);
                 textureNode->setOwnsTexture(true);
                 textureNode->setRect(boundingRect());
             }
         }
-        
+
         // Handle size changes
         QSize newSize = boundingRect().size().toSize();
         if (!newSize.isEmpty() && m_vulkanWindow->size() != newSize) {
@@ -260,14 +262,14 @@ QSGNode *VulkanItem::updatePaintNode(QSGNode *node, UpdatePaintNodeData *data)
         // Fallback: create a simple animated texture
         static int frame = 0;
         frame++;
-        
+
         QImage fallbackImage(256, 256, QImage::Format_RGBA8888);
         // Create a simple animation - changing colors
         int r = (frame * 2) % 255;
         int g = (frame * 3) % 255; 
         int b = (frame * 5) % 255;
         fallbackImage.fill(QColor(r, g, b));
-        
+
         if (window()) {
             QSGTexture *fallbackTexture = window()->createTextureFromImage(fallbackImage);
             if (fallbackTexture) {
@@ -276,13 +278,13 @@ QSGNode *VulkanItem::updatePaintNode(QSGNode *node, UpdatePaintNodeData *data)
                 if (oldTexture && textureNode->ownsTexture()) {
                     delete oldTexture;
                 }
-                
+
                 textureNode->setTexture(fallbackTexture);
                 textureNode->setOwnsTexture(true);
                 textureNode->setRect(boundingRect());
             }
         }
     }
-    
+
     return textureNode;
 }

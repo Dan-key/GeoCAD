@@ -1,10 +1,22 @@
 #include <QGuiApplication>
 #include <QQmlApplicationEngine>
+#include <iostream>
 #include <QtQml>
+#include <vulkan/vulkan.h>
 #include "UI/cpp/VulkanItem.h"
 
 int main(int argc, char *argv[]) {
     QGuiApplication app(argc, argv);
+
+    uint32_t layerCount;
+    vkEnumerateInstanceLayerProperties(&layerCount, nullptr);
+
+    std::vector<VkLayerProperties> availableLayers(layerCount);
+    vkEnumerateInstanceLayerProperties(&layerCount, availableLayers.data());
+
+    for (const auto& layer : availableLayers) {
+        std::cout << layer.layerName << std::endl;
+    }
 
     qmlRegisterType<VulkanItem>("VulkanApp", 1, 0, "VulkanItem");
 
