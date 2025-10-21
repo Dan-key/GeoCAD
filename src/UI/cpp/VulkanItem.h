@@ -1,30 +1,32 @@
-#pragma once
+#ifndef VULKANITEM_H
+#define VULKANITEM_H
 
 #include <QQuickItem>
+#include <QSGRenderNode>
 #include <QVulkanInstance>
-#include <QVulkanWindowRenderer>
-#include <QVulkanDeviceFunctions>
-#include <QVulkanWindow>
-#include <QSGTexture>
-#include <QTimer>
+#include <QVulkanFunctions>
 
-class VulkanRenderer;
-
-class VulkanWindow : public QVulkanWindow
+class VulkanRenderNode : public QSGRenderNode
 {
-    Q_OBJECT
-
 public:
-    VulkanWindow();
-    QVulkanWindowRenderer *createRenderer() override;
-    QImage getRenderedImage();
-    
-    void renderFrame();
+    VulkanRenderNode(QQuickItem *item);
+    ~VulkanRenderNode();
+
+    void render(const RenderState *state) override;
+    void releaseResources() override;
+    StateFlags changedStates() const override;
+    RenderingFlags flags() const override;
 
 private:
-    friend class VulkanRenderer;
-    VulkanRenderer* m_renderer = nullptr;
-    QImage m_currentFrame;
+    void initVulkan();
+    void createCommandBuffer();
+    void recordCommandBuffer();
+
+    QQuickItem *m_item;
+    VkDevice m_device = VK_NULL_HANDLE;
+    VkCommandBuffer m_commandBuffer = VK_NULL_HANDLE;
+    VkCommandPool m_commandPool = VK_NULL_HANDLE;
+    bool m_initialized = false;
 };
 
 class VulkanItem : public QQuickItem
@@ -37,17 +39,10 @@ public:
     ~VulkanItem();
 
 protected:
-    QSGNode *updatePaintNode(QSGNode *node, UpdatePaintNodeData *data) override;
-
-private slots:
-    void handleWindowChanged(QQuickWindow *win);
-    void updateTexture();
+    QSGNode *updatePaintNode(QSGNode *oldNode, UpdatePaintNodeData *) override;
 
 private:
-    void setupVulkanWindow();
-    
-    QVulkanInstance m_instance;
-    VulkanWindow *m_vulkanWindow = nullptr;
-    QTimer *m_updateTimer = nullptr;
-    bool m_vulkanInitialized = false;
+    void ensureVulkanInstance();
 };
+
+#endif // VULKANITEM_H
