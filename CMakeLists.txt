@@ -27,6 +27,35 @@ GenerateQrc(${QRC_NAME} "/" ${CMAKE_CURRENT_BINARY_DIR})
 
 add_executable(${PROJECT_NAME} ${SOURCES} ${QRC_FILENAME})
 
+set(SPVASM_FILES
+    ${CMAKE_SOURCE_DIR}/src/UI/shaders/vertex.spvasm
+    ${CMAKE_SOURCE_DIR}/src/UI/shaders/frag.spvasm
+)
+
+# Map inputs to outputs in build directory (e.g., ${CMAKE_BINARY_DIR}/shaders)
+set(SPV_OUT_DIR ${CMAKE_BINARY_DIR}/shaders)
+file(MAKE_DIRECTORY ${SPV_OUT_DIR})
+
+set(SPV_OUT_FILES "")
+foreach(infile IN LISTS SPVASM_FILES)
+    get_filename_component(fname ${infile} NAME_WE)   # base name without ext
+    set(outfile ${SPV_OUT_DIR}/${fname}.spv)
+    list(APPEND SPV_OUT_FILES ${outfile})
+
+    add_custom_command(
+        OUTPUT ${outfile}
+        COMMAND ${CMAKE_COMMAND} -E make_directory ${SPV_OUT_DIR}
+        COMMAND spirv-as ${infile} -o ${outfile}
+        DEPENDS ${infile}
+        COMMENT "Assembling ${infile} -> ${outfile}"
+        VERBATIM
+    )
+endforeach()
+add_custom_target(spirv_shaders ALL DEPENDS ${SPV_OUT_FILES})
+
+# Ensure the executable depends on the shaders being built
+add_dependencies(${PROJECT_NAME} spirv_shaders)
+
 target_link_libraries(${PROJECT_NAME} Qt6::Core Qt6::Qml Qt6::Quick Vulkan::Vulkan)
 target_include_directories(${PROJECT_NAME} PRIVATE
     ${Vulkan_INCLUDE_DIRS}

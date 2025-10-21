@@ -18,6 +18,21 @@ int main(int argc, char *argv[]) {
     for (const auto& layer : availableLayers) {
         std::cout << layer.layerName << std::endl;
     }
+
+    QVulkanInstance inst;
+
+    inst.setApiVersion(QVersionNumber(1, 3));
+
+#ifdef QT_DEBUG
+    inst.setLayers({ "VK_LAYER_KHRONOS_validation" });
+#endif
+
+    if (!inst.create()) {
+        qFatal("Failed to create Vulkan instance: %d", inst.errorCode());
+        return -1;
+    }
+
+
     QQuickWindow::setGraphicsApi(QSGRendererInterface::VulkanRhi);
     qmlRegisterType<VulkanItem>("VulkanApp", 1, 0, "VulkanItem");
 
@@ -26,6 +41,10 @@ int main(int argc, char *argv[]) {
 
     if (engine.rootObjects().isEmpty())
         return -1;
+
+    QQuickWindow *window = qobject_cast<QQuickWindow *>(engine.rootObjects().first());
+    if (window)
+        window->setVulkanInstance(&inst);
 
     return app.exec();
 }
