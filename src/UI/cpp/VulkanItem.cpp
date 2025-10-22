@@ -35,10 +35,10 @@ VulkanRenderNode::VulkanRenderNode(QQuickItem *item)
     : m_item(item)
 {
     size_t size = 0;
-    vertShaderCode = read_spv("/home/daniel/GeoCAD/build/shaders/vertex.spv", &size);
+    vertShaderCode = read_spv("shaders/vertex.spv", &size);
     vertShaderSize = size;
     std::cout << "Vertex shader size: " << vertShaderSize << " bytes\n";
-    fragShaderCode = read_spv("/home/daniel/GeoCAD/build/shaders/frag.spv", &size);
+    fragShaderCode = read_spv("shaders/frag.spv", &size);
     fragShaderSize = size;
     std::cout << "Fragment shader size: " << fragShaderSize << " bytes\n";
 }
@@ -410,6 +410,7 @@ void VulkanRenderNode::createPipeline(VkRenderPass renderPass)
         VK_DYNAMIC_STATE_VIEWPORT, 
         VK_DYNAMIC_STATE_SCISSOR
     };
+
     VkPipelineDynamicStateCreateInfo dynamicState = {};
     dynamicState.sType = VK_STRUCTURE_TYPE_PIPELINE_DYNAMIC_STATE_CREATE_INFO;
     dynamicState.pNext = nullptr;
@@ -428,7 +429,6 @@ void VulkanRenderNode::createPipeline(VkRenderPass renderPass)
         pipelineLayoutInfo.pushConstantRangeCount = 0;
         pipelineLayoutInfo.pPushConstantRanges = nullptr;
 
-        
         result = m_devFuncs->vkCreatePipelineLayout(m_device, &pipelineLayoutInfo, nullptr, &m_pipelineLayout);
         if (result != VK_SUCCESS) {
             qWarning("Failed to create pipeline layout: %d", result);
@@ -465,7 +465,7 @@ void VulkanRenderNode::createPipeline(VkRenderPass renderPass)
     qDebug("  Render pass: %p", renderPass);
     qDebug("  Vert shader: %p", m_vertShaderModule);
     qDebug("  Frag shader: %p", m_fragShaderModule);
-    
+
     // Use m_devFuncs directly - it's proven to work
     result = m_devFuncs->vkCreateGraphicsPipelines(m_device, VK_NULL_HANDLE, 1, &pipelineInfo, nullptr, &m_graphicsPipeline);
     if (result != VK_SUCCESS) {
@@ -473,9 +473,130 @@ void VulkanRenderNode::createPipeline(VkRenderPass renderPass)
         m_graphicsPipeline = VK_NULL_HANDLE;
         return;
     }
-    
+
     m_pipelineCreated = true;
     qDebug("Graphics pipeline created successfully!");
+}
+
+void VulkanRenderNode::updateVertexBuffer()
+{
+    if (!m_verticesDirty || m_vertexBuffer == VK_NULL_HANDLE)
+        return;
+
+    void* data;
+    VkResult result = m_devFuncs->vkMapMemory(m_device, m_vertexBufferMemory, 0, 
+                                             sizeof(Vertex) * m_vertices.size(), 0, &data);
+    if (result == VK_SUCCESS) {
+        memcpy(data, m_vertices.data(), sizeof(Vertex) * m_vertices.size());
+        m_devFuncs->vkUnmapMemory(m_device, m_vertexBufferMemory);
+        m_verticesDirty = false;
+    }
+}
+
+void VulkanRenderNode::updateVertexPosition(const QPointF& position)
+{
+    if (m_vertices.size() >= 1) {
+        // Convert screen coordinates to normalized device coordinates
+        qreal x = (position.x() / m_item->width()) * 2.0 - 1.0;
+        qreal y = -(position.y() / m_item->height()) * 2.0 + 1.0;
+        
+        // Update the first vertex (top of triangle)
+        m_vertices[0].pos[0] = static_cast<float>(x);
+        m_vertices[0].pos[1] = static_cast<float>(y);
+        
+        m_verticesDirty = true;
+    }
+}
+
+void VulkanItem::mousePressEvent(QMouseEvent *event)
+{
+    // if (!m_interactive) {
+    //     event->ignore();
+    //     return;
+    // }
+
+    m_mousePressed = true;
+    QPointF localPos = event->position();
+
+    qDebug() << "Mouse pressed at:" << localPos;
+    emit mousePressed(localPos.x(), localPos.y());
+    
+    if (m_renderNode) {
+        m_renderNode->updateVertexPosition(localPos);
+        update(); // Request repaint
+    }
+    
+    event->accept();
+}
+
+void VulkanItem::mouseMoveEvent(QMouseEvent *event)
+{
+    // if (!m_interactive) {
+    //     event->ignore();
+    //     return;
+    // }
+    
+    QPointF localPos = event->position();
+    
+    if (m_mousePressed && m_renderNode) {
+        // Update triangle position while dragging
+        m_renderNode->updateVertexPosition(localPos);
+        update(); // Request repaint
+    }
+    
+    emit mouseMoved(localPos.x(), localPos.y());
+    event->accept();
+}
+
+void VulkanItem::mouseReleaseEvent(QMouseEvent *event)
+{
+    // if (!m_interactive) {
+    //     event->ignore();
+    //     return;
+    // }
+    
+    m_mousePressed = false;
+    QPointF localPos = event->position();
+    
+    qDebug() << "Mouse released at:" << localPos;
+    emit mouseReleased(localPos.x(), localPos.y());
+    
+    event->accept();
+}
+
+void VulkanItem::hoverEnterEvent(QHoverEvent *event)
+{
+    // if (!m_interactive) {
+    //     event->ignore();
+    //     return;
+    // }
+    
+    QPointF localPos = event->position();
+    emit hoverPositionChanged(localPos.x(), localPos.y());
+    event->accept();
+}
+
+void VulkanItem::hoverMoveEvent(QHoverEvent *event)
+{
+    // if (!m_interactive) {
+    //     event->ignore();
+    //     return;
+    // }
+    
+    QPointF localPos = event->position();
+    emit hoverPositionChanged(localPos.x(), localPos.y());
+    event->accept();
+}
+
+void VulkanItem::hoverLeaveEvent(QHoverEvent *event)
+{
+    // if (!m_interactive) {
+    //     event->ignore();
+    //     return;
+    // }
+    
+    emit hoverPositionChanged(-1, -1); // Signal that hover left
+    event->accept();
 }
 
 void VulkanRenderNode::render(const RenderState *state)
@@ -628,6 +749,8 @@ VulkanItem::VulkanItem(QQuickItem *parent)
     : QQuickItem(parent)
 {
     setFlag(ItemHasContents, true);
+    setAcceptedMouseButtons(Qt::AllButtons);
+    setAcceptHoverEvents(true);
 }
 
 QSGNode *VulkanItem::updatePaintNode(QSGNode *oldNode, UpdatePaintNodeData *)

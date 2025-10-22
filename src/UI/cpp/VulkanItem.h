@@ -23,6 +23,9 @@ public:
     StateFlags changedStates() const override;
     RenderingFlags flags() const override;
 
+    // Add method to update vertices based on mouse input
+    void updateVertexPosition(const QPointF& position);
+
 private:
     void initVulkan();
     void createCommandPool();
@@ -30,6 +33,7 @@ private:
     void createShaderModules();
     void createPipeline(VkRenderPass renderPass);
     void recordCommandBuffer(const RenderState *state);
+    void updateVertexBuffer();
 
     QQuickItem *m_item;
     QVulkanInstance *m_vulkanInstance = nullptr;
@@ -52,7 +56,10 @@ private:
     
     bool m_initialized = false;
     bool m_pipelineCreated = false;
-    uint32_t m_queueFamilyIndex = 0;
+    
+    // Store vertices for dynamic updates
+    std::vector<Vertex> m_vertices;
+    bool m_verticesDirty = false;
 };
 
 class VulkanItem : public QQuickItem
@@ -60,11 +67,43 @@ class VulkanItem : public QQuickItem
     Q_OBJECT
     QML_ELEMENT
 
+    // Add properties for mouse interaction
+    // Q_PROPERTY(bool interactive READ interactive WRITE setInteractive NOTIFY interactiveChanged)
+    // Q_PROPERTY(QColor triangleColor READ triangleColor WRITE setTriangleColor NOTIFY triangleColorChanged)
+
 public:
     VulkanItem(QQuickItem *parent = nullptr);
 
+    // bool interactive() const { return m_interactive; }
+    // void setInteractive(bool interactive);
+
+    // QColor triangleColor() const { return m_triangleColor; }
+    // void setTriangleColor(const QColor& color);
+
 protected:
     QSGNode *updatePaintNode(QSGNode *oldNode, UpdatePaintNodeData *) override;
+    
+    // Mouse event handlers
+    void mousePressEvent(QMouseEvent *event) override;
+    void mouseMoveEvent(QMouseEvent *event) override;
+    void mouseReleaseEvent(QMouseEvent *event) override;
+    void hoverEnterEvent(QHoverEvent *event) override;
+    void hoverMoveEvent(QHoverEvent *event) override;
+    void hoverLeaveEvent(QHoverEvent *event) override;
+
+signals:
+    void interactiveChanged();
+    void triangleColorChanged();
+    void mousePressed(qreal x, qreal y);
+    void mouseMoved(qreal x, qreal y);
+    void mouseReleased(qreal x, qreal y);
+    void hoverPositionChanged(qreal x, qreal y);
+
+private:
+    VulkanRenderNode *m_renderNode = nullptr;
+    // bool m_interactive = true;
+    // QColor m_triangleColor = Qt::red;
+    bool m_mousePressed = false;
 };
 
 #endif // VULKANITEM_H
