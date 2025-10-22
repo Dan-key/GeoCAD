@@ -185,15 +185,16 @@ void VulkanRenderNode::createCommandPool()
 void VulkanRenderNode::createVertexBuffer()
 {
     // Triangle vertices with colors (position XY, color RGB)
-    Vertex vertices[] = {
+    m_vertices = {
         {{0.0f, -0.5f}, {1.0f, 0.0f, 0.0f}},  // Top - Red
         {{0.5f, 0.5f}, {0.0f, 1.0f, 0.0f}},   // Right - Green
         {{-0.5f, 0.5f}, {0.0f, 0.0f, 1.0f}}   // Left - Blue
     };
 
+
     VkBufferCreateInfo bufferInfo = {};
     bufferInfo.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
-    bufferInfo.size = sizeof(vertices);
+    bufferInfo.size = m_vertices.size() * sizeof(decltype(m_vertices)::value_type);
     bufferInfo.usage = VK_BUFFER_USAGE_VERTEX_BUFFER_BIT;
     bufferInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
 
@@ -213,7 +214,7 @@ void VulkanRenderNode::createVertexBuffer()
 
     void* data;
     m_devFuncs->vkMapMemory(m_device, m_vertexBufferMemory, 0, bufferInfo.size, 0, &data);
-    memcpy(data, vertices, sizeof(vertices));
+    memcpy(data, m_vertices.data() , m_vertices.size() * sizeof(decltype(m_vertices)::value_type));
     m_devFuncs->vkUnmapMemory(m_device, m_vertexBufferMemory);
 }
 
@@ -466,7 +467,6 @@ void VulkanRenderNode::createPipeline(VkRenderPass renderPass)
     qDebug("  Vert shader: %p", m_vertShaderModule);
     qDebug("  Frag shader: %p", m_fragShaderModule);
 
-    // Use m_devFuncs directly - it's proven to work
     result = m_devFuncs->vkCreateGraphicsPipelines(m_device, VK_NULL_HANDLE, 1, &pipelineInfo, nullptr, &m_graphicsPipeline);
     if (result != VK_SUCCESS) {
         qWarning("Failed to create graphics pipeline: %d", result);
@@ -495,26 +495,23 @@ void VulkanRenderNode::updateVertexBuffer()
 
 void VulkanRenderNode::updateVertexPosition(const QPointF& position)
 {
+    qDebug() << "Updating vertex position to:" << position;
     if (m_vertices.size() >= 1) {
-        // Convert screen coordinates to normalized device coordinates
-        qreal x = (position.x() / m_item->width()) * 2.0 - 1.0;
-        qreal y = -(position.y() / m_item->height()) * 2.0 + 1.0;
-        
-        // Update the first vertex (top of triangle)
+
+        double x = (position.x() / m_item->width()) * 2.0 - 1.0;
+        double y = (position.y() / m_item->height()) * 2.0 - 1.0;
+
         m_vertices[0].pos[0] = static_cast<float>(x);
         m_vertices[0].pos[1] = static_cast<float>(y);
         
         m_verticesDirty = true;
+        qDebug() << "Vertex updated to:" << m_vertices[0].pos[0] << m_vertices[0].pos[1];
     }
+    updateVertexBuffer();
 }
 
 void VulkanItem::mousePressEvent(QMouseEvent *event)
 {
-    // if (!m_interactive) {
-    //     event->ignore();
-    //     return;
-    // }
-
     m_mousePressed = true;
     QPointF localPos = event->position();
 
@@ -523,7 +520,7 @@ void VulkanItem::mousePressEvent(QMouseEvent *event)
     
     if (m_renderNode) {
         m_renderNode->updateVertexPosition(localPos);
-        update(); // Request repaint
+        update();
     }
     
     event->accept();
@@ -531,17 +528,11 @@ void VulkanItem::mousePressEvent(QMouseEvent *event)
 
 void VulkanItem::mouseMoveEvent(QMouseEvent *event)
 {
-    // if (!m_interactive) {
-    //     event->ignore();
-    //     return;
-    // }
-    
     QPointF localPos = event->position();
     
     if (m_mousePressed && m_renderNode) {
-        // Update triangle position while dragging
         m_renderNode->updateVertexPosition(localPos);
-        update(); // Request repaint
+        update();
     }
     
     emit mouseMoved(localPos.x(), localPos.y());
@@ -550,11 +541,6 @@ void VulkanItem::mouseMoveEvent(QMouseEvent *event)
 
 void VulkanItem::mouseReleaseEvent(QMouseEvent *event)
 {
-    // if (!m_interactive) {
-    //     event->ignore();
-    //     return;
-    // }
-    
     m_mousePressed = false;
     QPointF localPos = event->position();
     
@@ -566,11 +552,6 @@ void VulkanItem::mouseReleaseEvent(QMouseEvent *event)
 
 void VulkanItem::hoverEnterEvent(QHoverEvent *event)
 {
-    // if (!m_interactive) {
-    //     event->ignore();
-    //     return;
-    // }
-    
     QPointF localPos = event->position();
     emit hoverPositionChanged(localPos.x(), localPos.y());
     event->accept();
@@ -578,11 +559,6 @@ void VulkanItem::hoverEnterEvent(QHoverEvent *event)
 
 void VulkanItem::hoverMoveEvent(QHoverEvent *event)
 {
-    // if (!m_interactive) {
-    //     event->ignore();
-    //     return;
-    // }
-    
     QPointF localPos = event->position();
     emit hoverPositionChanged(localPos.x(), localPos.y());
     event->accept();
@@ -590,11 +566,6 @@ void VulkanItem::hoverMoveEvent(QHoverEvent *event)
 
 void VulkanItem::hoverLeaveEvent(QHoverEvent *event)
 {
-    // if (!m_interactive) {
-    //     event->ignore();
-    //     return;
-    // }
-    
     emit hoverPositionChanged(-1, -1); // Signal that hover left
     event->accept();
 }
@@ -606,29 +577,29 @@ void VulkanRenderNode::render(const RenderState *state)
 
     if (!m_initialized || m_commandBuffer == VK_NULL_HANDLE)
         return;
-    
+
     // Get the current render pass from Qt at render time
     QQuickWindow *window = m_item->window();
     if (!window)
         return;
-        
+
     QSGRendererInterface *rif = window->rendererInterface();
     if (!rif)
         return;
-    
+
     VkRenderPass currentRenderPass = *static_cast<VkRenderPass *>(
         rif->getResource(window, QSGRendererInterface::RenderPassResource));
-    
+
     if (currentRenderPass == VK_NULL_HANDLE) {
         qWarning("Invalid render pass at render time!");
         return;
     }
-    
+
     // Create pipeline on first render with the actual render pass
     if (!m_pipelineCreated) {
         createPipeline(currentRenderPass);
     }
-    
+
     if (m_graphicsPipeline == VK_NULL_HANDLE)
         return;
 
@@ -756,11 +727,11 @@ VulkanItem::VulkanItem(QQuickItem *parent)
 QSGNode *VulkanItem::updatePaintNode(QSGNode *oldNode, UpdatePaintNodeData *)
 {
     VulkanRenderNode *node = static_cast<VulkanRenderNode *>(oldNode);
-    
+
     if (!node)
         node = new VulkanRenderNode(this);
-
+    m_renderNode = node;
     node->markDirty(QSGNode::DirtyMaterial);
-    
+
     return node;
 }
