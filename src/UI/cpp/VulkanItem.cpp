@@ -65,12 +65,13 @@ uint32_t findGraphicsQueueFamily(VkPhysicalDevice physicalDevice)
 {
     uint32_t queueFamilyCount = 0;
     vkGetPhysicalDeviceQueueFamilyProperties(physicalDevice, &queueFamilyCount, nullptr);
-    
+
     std::vector<VkQueueFamilyProperties> queueFamilies(queueFamilyCount);
     vkGetPhysicalDeviceQueueFamilyProperties(physicalDevice, &queueFamilyCount, queueFamilies.data());
-    
+
     for (uint32_t i = 0; i < queueFamilyCount; i++) {
         if (queueFamilies[i].queueFlags & VK_QUEUE_GRAPHICS_BIT) {
+            std::cout << "Found graphics queue family at index: " << i << " " << queueFamilies[i].queueCount << std::endl;
             return i;
         }
     }
@@ -93,7 +94,7 @@ void VulkanRenderNode::initVulkan()
         qWarning("No renderer interface!");
         return;
     }
-    
+ 
     if (rif->graphicsApi() != QSGRendererInterface::VulkanRhi) {
         qWarning("Not using Vulkan RHI!");
         return;
@@ -104,7 +105,7 @@ void VulkanRenderNode::initVulkan()
         qWarning("No Vulkan instance!");
         return;
     }
-    
+
     m_device = *static_cast<VkDevice *>(rif->getResource(window, QSGRendererInterface::DeviceResource));
     m_physicalDevice = *static_cast<VkPhysicalDevice *>(rif->getResource(window, QSGRendererInterface::PhysicalDeviceResource));
     
@@ -118,10 +119,10 @@ void VulkanRenderNode::initVulkan()
         qWarning("Failed to get device functions!");
         return;
     }
-    
+
     qDebug("Device functions pointer: %p", m_devFuncs);
     qDebug("Testing a simple Vulkan call...");
-    
+
     // Test that device functions work with a simple call
     VkPhysicalDeviceProperties props;
     vkGetPhysicalDeviceProperties(m_physicalDevice, &props);
@@ -132,13 +133,13 @@ void VulkanRenderNode::initVulkan()
         qWarning("Failed to create command pool or buffer!");
         return;
     }
-    
+
     createVertexBuffer();
     if (m_vertexBuffer == VK_NULL_HANDLE) {
         qWarning("Failed to create vertex buffer!");
         return;
     }
-    
+
     createShaderModules();
     if (m_vertShaderModule == VK_NULL_HANDLE || m_fragShaderModule == VK_NULL_HANDLE) {
         qWarning("Failed to create shader modules!");
@@ -153,22 +154,22 @@ void VulkanRenderNode::createCommandPool()
 {
     // Find graphics queue family
     uint32_t queueFamilyIndex = findGraphicsQueueFamily(m_physicalDevice);
-    
+
     // Get the graphics queue
     m_devFuncs->vkGetDeviceQueue(m_device, queueFamilyIndex, 0, &m_graphicsQueue);
-    
+
     // Create command pool
     VkCommandPoolCreateInfo poolInfo = {};
     poolInfo.sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO;
     poolInfo.queueFamilyIndex = queueFamilyIndex;
     poolInfo.flags = VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT;
-    
+
     VkResult result = m_devFuncs->vkCreateCommandPool(m_device, &poolInfo, nullptr, &m_commandPool);
     if (result != VK_SUCCESS) {
         qWarning("Failed to create command pool: %d", result);
         return;
     }
-    
+
     // Allocate command buffer
     VkCommandBufferAllocateInfo allocInfo = {};
     allocInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
@@ -226,7 +227,7 @@ void VulkanRenderNode::createShaderModules()
     // Vertex shader
     createInfo.codeSize = vertShaderSize;
     createInfo.pCode = vertShaderCode;
-    
+
     qDebug("Creating vertex shader module, size: %zu bytes", vertShaderSize);
     VkResult result = m_devFuncs->vkCreateShaderModule(m_device, &createInfo, nullptr, &m_vertShaderModule);
     if (result != VK_SUCCESS) {
@@ -238,7 +239,7 @@ void VulkanRenderNode::createShaderModules()
     // Fragment shader
     createInfo.codeSize = fragShaderSize;
     createInfo.pCode = fragShaderCode;
-    
+
     qDebug("Creating fragment shader module, size: %zu bytes", fragShaderSize);
     result = m_devFuncs->vkCreateShaderModule(m_device, &createInfo, nullptr, &m_fragShaderModule);
     if (result != VK_SUCCESS) {
@@ -255,25 +256,25 @@ void VulkanRenderNode::createPipeline(VkRenderPass renderPass)
         qWarning("Cannot create pipeline: invalid render pass");
         return;
     }
-    
+
     // Don't recreate if already created
     if (m_pipelineCreated && m_graphicsPipeline != VK_NULL_HANDLE) {
         return;
     }
 
     qDebug("Creating graphics pipeline with render pass %p", renderPass);
-    
+
     // Verify all prerequisites
     if (!m_devFuncs) {
         qWarning("No device functions!");
         return;
     }
-    
+
     if (m_device == VK_NULL_HANDLE) {
         qWarning("No device!");
         return;
     }
-    
+
     if (m_vertShaderModule == VK_NULL_HANDLE || m_fragShaderModule == VK_NULL_HANDLE) {
         qWarning("Shader modules not created!");
         return;
@@ -283,7 +284,7 @@ void VulkanRenderNode::createPipeline(VkRenderPass renderPass)
 
     // Shader stages
     VkPipelineShaderStageCreateInfo shaderStages[2] = {};
-    
+
     shaderStages[0].sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
     shaderStages[0].stage = VK_SHADER_STAGE_VERTEX_BIT;
     shaderStages[0].module = m_vertShaderModule;
@@ -517,24 +518,24 @@ void VulkanItem::mousePressEvent(QMouseEvent *event)
 
     qDebug() << "Mouse pressed at:" << localPos;
     emit mousePressed(localPos.x(), localPos.y());
-    
-    if (m_renderNode) {
+
+    if (m_renderNode && event->buttons() & Qt::LeftButton) {
         m_renderNode->updateVertexPosition(localPos);
         update();
     }
-    
+
     event->accept();
 }
 
 void VulkanItem::mouseMoveEvent(QMouseEvent *event)
 {
     QPointF localPos = event->position();
-    
-    if (m_mousePressed && m_renderNode) {
+
+    if (m_mousePressed && m_renderNode && event->buttons() & Qt::LeftButton) {
         m_renderNode->updateVertexPosition(localPos);
         update();
     }
-    
+
     emit mouseMoved(localPos.x(), localPos.y());
     event->accept();
 }
@@ -543,10 +544,10 @@ void VulkanItem::mouseReleaseEvent(QMouseEvent *event)
 {
     m_mousePressed = false;
     QPointF localPos = event->position();
-    
+
     qDebug() << "Mouse released at:" << localPos;
     emit mouseReleased(localPos.x(), localPos.y());
-    
+
     event->accept();
 }
 
@@ -612,14 +613,14 @@ void VulkanRenderNode::recordCommandBuffer(const RenderState *state)
     QQuickWindow *window = m_item->window();
     if (!window)
         return;
-        
+
     QSGRendererInterface *rif = window->rendererInterface();
     if (!rif)
         return;
-    
+
     VkCommandBuffer qtCommandBuffer = *static_cast<VkCommandBuffer *>(
         rif->getResource(window, QSGRendererInterface::CommandListResource));
-    
+
     if (qtCommandBuffer == VK_NULL_HANDLE) {
         qWarning("No command buffer from Qt!");
         return;
