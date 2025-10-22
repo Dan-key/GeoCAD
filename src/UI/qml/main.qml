@@ -8,11 +8,14 @@ ApplicationWindow {
     width: 400
     height: 300
     title: "Simple QML Application"
+    topPadding: 0
+    leftPadding: 0
+    bottomPadding: 0
+    rightPadding: 0
 
     VulkanItem {
         id: vulkanItem
         anchors.fill: parent
-        anchors.margins: 10
 
         Rectangle {
             anchors.fill: parent

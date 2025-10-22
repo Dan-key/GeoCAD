@@ -7,8 +7,9 @@
 #include <QQuickWindow>
 
 int main(int argc, char *argv[]) {
+    qputenv("QT_QPA_PLATFORM", QByteArray("xcb")); 
+    qputenv("QT_QPA_PLATFORMTHEME", QByteArray("gnome"));
     QGuiApplication app(argc, argv);
-
     uint32_t layerCount;
     vkEnumerateInstanceLayerProperties(&layerCount, nullptr);
 
