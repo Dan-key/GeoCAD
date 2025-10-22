@@ -44,8 +44,9 @@ int main(int argc, char *argv[])
         return -1;
 
     QQuickWindow *window = qobject_cast<QQuickWindow *>(engine.rootObjects().first());
-    if (window)
+    if (window) {
         window->setVulkanInstance(&inst);
+    }
 
     return app.exec();
 }

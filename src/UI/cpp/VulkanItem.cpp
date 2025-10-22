@@ -632,8 +632,12 @@ void VulkanRenderNode::recordCommandBuffer(const RenderState *state)
     m_devFuncs->vkCmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, m_graphicsPipeline);
 
     // Set viewport and scissor
-    const QRectF rect = matrix()->mapRect(QRectF(0, 0, m_item->width(), m_item->height()));
-    
+    QRectF rect = matrix()->mapRect(QRectF(0, 0, m_item->width(), m_item->height()));
+    qreal dpr = window->devicePixelRatio();
+    qDebug() << "rect view" << rect;
+    rect.setWidth(dpr*rect.width());
+    rect.setHeight(dpr*rect.height());
+
     VkViewport viewport = {};
     viewport.x = rect.x();
     viewport.y = rect.y();
