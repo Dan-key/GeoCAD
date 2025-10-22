@@ -6,7 +6,8 @@
 #include "UI/cpp/VulkanItem.h"
 #include <QQuickWindow>
 
-int main(int argc, char *argv[]) {
+int main(int argc, char *argv[])
+{
     qputenv("QT_QPA_PLATFORM", QByteArray("xcb")); 
     qputenv("QT_QPA_PLATFORMTHEME", QByteArray("gnome"));
     QGuiApplication app(argc, argv);
@@ -32,7 +33,6 @@ int main(int argc, char *argv[]) {
         qFatal("Failed to create Vulkan instance: %d", inst.errorCode());
         return -1;
     }
-
 
     QQuickWindow::setGraphicsApi(QSGRendererInterface::VulkanRhi);
     qmlRegisterType<VulkanItem>("VulkanApp", 1, 0, "VulkanItem");
