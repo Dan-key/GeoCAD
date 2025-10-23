@@ -1,5 +1,7 @@
 #include <cstddef>
 #include <cstdint>
+#include <qmath.h>
+#include <qquaternion.h>
 #include <vulkan/vulkan.h>
 #include "VulkanItem.h"
 #include <QQuickWindow>
@@ -7,6 +9,7 @@
 #include <cstring>
 #include <vector>
 #include <iostream>
+#include <QTimer>
 
 namespace {
 
@@ -212,9 +215,9 @@ void VulkanRenderNode::createVertexBuffer()
 {
     // Triangle vertices with colors (position XY, color RGB)
     m_vertices = {
-        {{0.0f, 1.0f}, {1.0f, 0.0f, 0.0f}},  // Top - Red
-        {{0.5f, 0.5f}, {0.0f, 1.0f, 0.0f}},   // Right - Green
-        {{-0.5f, 0.5f}, {0.0f, 0.0f, 1.0f}}   // Left - Blue
+        {{0.0f, -0.05f}, {1.0f, 0.0f, 0.0f}},  // Top - Red
+        {{0.05f, 0.05f}, {0.0f, 1.0f, 0.0f}},   // Right - Green
+        {{-0.05f, 0.05f}, {0.0f, 0.0f, 1.0f}}   // Left - Blue
     };
 
 
@@ -447,14 +450,17 @@ void VulkanRenderNode::createPipeline(VkRenderPass renderPass)
 
     // Pipeline layout (create if not exists)
     if (m_pipelineLayout == VK_NULL_HANDLE) {
+        VkPushConstantRange pushConstantRange = {};
+        pushConstantRange.stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
+        pushConstantRange.offset = 0;
+        pushConstantRange.size = sizeof(QMatrix4x4);
+
         VkPipelineLayoutCreateInfo pipelineLayoutInfo = {};
         pipelineLayoutInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
-        pipelineLayoutInfo.pNext = nullptr;
-        pipelineLayoutInfo.flags = 0;
+        pipelineLayoutInfo.pushConstantRangeCount = 1;
+        pipelineLayoutInfo.pPushConstantRanges = &pushConstantRange;
         pipelineLayoutInfo.setLayoutCount = 0;
         pipelineLayoutInfo.pSetLayouts = nullptr;
-        pipelineLayoutInfo.pushConstantRangeCount = 0;
-        pipelineLayoutInfo.pPushConstantRanges = nullptr;
 
         result = m_devFuncs->vkCreatePipelineLayout(m_device, &pipelineLayoutInfo, nullptr, &m_pipelineLayout);
         if (result != VK_SUCCESS) {
@@ -653,6 +659,24 @@ void VulkanRenderNode::recordCommandBuffer(const RenderState *state)
 
     // Use Qt's command buffer instead of our own
     VkCommandBuffer commandBuffer = qtCommandBuffer;
+    float time = QTime::currentTime().msecsSinceStartOfDay() % 10000;
+    float angle = time;
+    QMatrix4x4 model{};
+    model.rotate(angle/2, 0, 1, 0);
+    QMatrix4x4 view{};
+    view.translate({0, 0 ,  -9.0f});
+    QMatrix4x4 projection{};
+    projection.perspective(qDegreesToRadians(60), 1.0f, 0.1f, 10.f);
+    projection.data()[1 + 1*4] *= -1;
+    QMatrix4x4 mvp = projection * view * model;
+    vkCmdPushConstants(
+        commandBuffer,
+        m_pipelineLayout,
+        VK_SHADER_STAGE_VERTEX_BIT,
+        0,
+        sizeof(QMatrix4x4),
+        mvp.constData()   // pointer to raw float[16]
+    );
 
     // Bind pipeline
     m_devFuncs->vkCmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, m_graphicsPipeline);
@@ -660,7 +684,6 @@ void VulkanRenderNode::recordCommandBuffer(const RenderState *state)
     // Set viewport and scissor
     QRectF rect = matrix()->mapRect(QRectF(m_item->x(), m_item->y(), m_item->width(), m_item->height()));
     qreal dpr = window->devicePixelRatio();
-    qDebug() << "rect view" << rect;
     rect.setWidth(dpr*rect.width());
     rect.setHeight(dpr*rect.height());
 
@@ -752,12 +775,14 @@ VulkanItem::VulkanItem(QQuickItem *parent)
     setFlag(ItemHasContents, true);
     setAcceptedMouseButtons(Qt::AllButtons);
     setAcceptHoverEvents(true);
+    QTimer *timer = new QTimer(this);
+    connect(timer, &QTimer::timeout, this, &VulkanItem::update);
+    timer->start(10); 
 }
 
 QSGNode *VulkanItem::updatePaintNode(QSGNode *oldNode, UpdatePaintNodeData *)
 {
     VulkanRenderNode *node = static_cast<VulkanRenderNode *>(oldNode);
-
     if (!node)
         node = new VulkanRenderNode(this);
     m_renderNode = node;
