@@ -8,6 +8,7 @@
 #include <vector>
 #include <iostream>
 
+namespace {
 
 uint32_t* read_spv(const char* path, size_t* out_size_bytes) {
     FILE* f = fopen(path, "rb");
@@ -22,6 +23,26 @@ uint32_t* read_spv(const char* path, size_t* out_size_bytes) {
     fclose(f);
     *out_size_bytes = (size_t)sz;
     return data;
+}
+
+std::string queueFamiliesFlagsToString(VkQueueFlags flags)
+{
+    std::string res = "";
+    if (flags & VK_QUEUE_GRAPHICS_BIT) {
+        res += "GRAPHICS ";
+    }
+    if (flags & VK_QUEUE_COMPUTE_BIT) {
+        res += "COMPUTE ";
+    }
+    if (flags & VK_QUEUE_TRANSFER_BIT) {
+        res += "TRANSFER ";
+    }
+    if (flags & VK_QUEUE_SPARSE_BINDING_BIT) {
+        res += "SPARSE_BINDING ";
+    }
+    return res;
+}
+
 }
 
 // Vertex shader (SPIR-V bytecode)
@@ -68,14 +89,14 @@ uint32_t findGraphicsQueueFamily(VkPhysicalDevice physicalDevice)
 
     std::vector<VkQueueFamilyProperties> queueFamilies(queueFamilyCount);
     vkGetPhysicalDeviceQueueFamilyProperties(physicalDevice, &queueFamilyCount, queueFamilies.data());
-
+    uint32_t res = 0;
     for (uint32_t i = 0; i < queueFamilyCount; i++) {
+        qDebug() << "family i " << i << " count " <<queueFamilies[i].queueCount << " flags " << queueFamiliesFlagsToString(queueFamilies[i].queueFlags); 
         if (queueFamilies[i].queueFlags & VK_QUEUE_GRAPHICS_BIT) {
-            std::cout << "Found graphics queue family at index: " << i << " " << queueFamilies[i].queueCount << std::endl;
-            return i;
+            res = i;
         }
     }
-    return 0;
+    return res;
 }
 
 void VulkanRenderNode::initVulkan()
@@ -160,7 +181,7 @@ void VulkanRenderNode::createCommandPool()
     uint32_t queueFamilyIndex = findGraphicsQueueFamily(m_physicalDevice);
 
     // Get the graphics queue
-    m_devFuncs->vkGetDeviceQueue(m_device, queueFamilyIndex, 0, &m_graphicsQueue);
+    // m_devFuncs->vkGetDeviceQueue(m_device, queueFamilyIndex, 0, &m_graphicsQueue);
 
     // Create command pool
     VkCommandPoolCreateInfo poolInfo = {};
