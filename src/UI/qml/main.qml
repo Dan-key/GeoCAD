@@ -1,5 +1,7 @@
 import QtQuick 2.15
 import QtQuick.Controls 2.15
+import QtQuick.Layouts 2.15
+
 
 import VulkanApp 1.0
 
@@ -12,16 +14,35 @@ ApplicationWindow {
     leftPadding: 0
     bottomPadding: 0
     rightPadding: 0
-
-    VulkanItem {
-        id: vulkanItem
+    ColumnLayout {
         anchors.fill: parent
-
         Rectangle {
-            anchors.fill: parent
-            color: "transparent"
-            border.color: "white"
-            border.width: 2
+            visible:true
+            Layout.fillWidth: true
+            height: 50
+            color: "#2c3e50"
+            Text {
+                anchors.centerIn: parent
+                text: "GeoCAD Vulkan Application"
+                color: "white"
+                font.pixelSize: 20
+            }
+        }
+        spacing: 0
+        VulkanItem {
+            id: vulkanItem
+            Layout.fillWidth: true
+            Layout.fillHeight: true
+            clip: {
+                console.log("height",  vulkanItem.height);
+                return true;
+            }
+            Rectangle {
+                anchors.fill: parent
+                color: '#9db0c4'
+                border.color: "white"
+                border.width: 2
+            }
         }
     }
 }

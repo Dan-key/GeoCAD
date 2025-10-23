@@ -128,6 +128,10 @@ void VulkanRenderNode::initVulkan()
     vkGetPhysicalDeviceProperties(m_physicalDevice, &props);
     qDebug("GPU: %s", props.deviceName);
 
+    VkPhysicalDeviceFeatures features;
+    vkGetPhysicalDeviceFeatures(m_physicalDevice, &features);
+    qDebug("wideline supported: %d", features.wideLines);
+
     createCommandPool();
     if (m_commandPool == VK_NULL_HANDLE || m_commandBuffer == VK_NULL_HANDLE) {
         qWarning("Failed to create command pool or buffer!");
@@ -633,7 +637,7 @@ void VulkanRenderNode::recordCommandBuffer(const RenderState *state)
     m_devFuncs->vkCmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, m_graphicsPipeline);
 
     // Set viewport and scissor
-    QRectF rect = matrix()->mapRect(QRectF(0, 0, m_item->width(), m_item->height()));
+    QRectF rect = matrix()->mapRect(QRectF(m_item->x(), m_item->y(), m_item->width(), m_item->height()));
     qreal dpr = window->devicePixelRatio();
     qDebug() << "rect view" << rect;
     rect.setWidth(dpr*rect.width());
