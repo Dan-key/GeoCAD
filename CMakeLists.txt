@@ -27,10 +27,10 @@ GenerateQrc(${QRC_NAME} "/" ${CMAKE_CURRENT_BINARY_DIR})
 
 add_executable(${PROJECT_NAME} ${SOURCES} ${QRC_FILENAME})
 
-set(SPVASM_FILES
-    ${CMAKE_SOURCE_DIR}/src/UI/shaders/vertex.spvasm
-    ${CMAKE_SOURCE_DIR}/src/UI/shaders/frag.spvasm
-)
+file(GLOB SPVASM_FILES "${CMAKE_SOURCE_DIR}/src/UI/shaders/*")
+if(NOT SPVASM_FILES)
+    message(WARNING "No .spvasm files found in ${CMAKE_SOURCE_DIR}/src/UI/shaders/")
+endif()
 
 # Map inputs to outputs in build directory (e.g., ${CMAKE_BINARY_DIR}/shaders)
 set(SPV_OUT_DIR ${CMAKE_BINARY_DIR}/shaders)
@@ -45,7 +45,7 @@ foreach(infile IN LISTS SPVASM_FILES)
     add_custom_command(
         OUTPUT ${outfile}
         COMMAND ${CMAKE_COMMAND} -E make_directory ${SPV_OUT_DIR}
-        COMMAND spirv-as ${infile} -o ${outfile}
+        COMMAND glslangValidator -V ${infile} -o ${outfile}
         DEPENDS ${infile}
         COMMENT "Assembling ${infile} -> ${outfile}"
         VERBATIM

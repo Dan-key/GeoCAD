@@ -187,7 +187,7 @@ void VulkanRenderNode::createVertexBuffer()
 {
     // Triangle vertices with colors (position XY, color RGB)
     m_vertices = {
-        {{0.0f, -0.5f}, {1.0f, 0.0f, 0.0f}},  // Top - Red
+        {{0.0f, 1.0f}, {1.0f, 0.0f, 0.0f}},  // Top - Red
         {{0.5f, 0.5f}, {0.0f, 1.0f, 0.0f}},   // Right - Green
         {{-0.5f, 0.5f}, {0.0f, 0.0f, 1.0f}}   // Left - Blue
     };
