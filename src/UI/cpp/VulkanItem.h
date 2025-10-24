@@ -29,11 +29,16 @@ public:
 private:
     void initVulkan();
     void createCommandPool();
-    void createVertexBuffer();
+    void createTriangleVertexBuffer();
+    void createLineVertexBuffer();
     void createShaderModules();
-    void createPipeline(VkRenderPass renderPass);
+    void createTrianglePipeline(VkRenderPass renderPass);
+    void createLinePipeline(VkRenderPass renderPass);
     void recordCommandBuffer(const RenderState *state);
     void updateVertexBuffer();
+
+    void drawTriangle(VkCommandBuffer);
+    void drawLine(VkCommandBuffer);
 
     QQuickItem *m_item;
     QVulkanInstance *m_vulkanInstance = nullptr;
@@ -45,20 +50,30 @@ private:
     VkCommandBuffer m_commandBuffer = VK_NULL_HANDLE;
     VkCommandPool m_commandPool = VK_NULL_HANDLE;
     
-    VkBuffer m_vertexBuffer = VK_NULL_HANDLE;
-    VkDeviceMemory m_vertexBufferMemory = VK_NULL_HANDLE;
+    VkBuffer m_vertexTriangleBuffer = VK_NULL_HANDLE;
+    VkDeviceMemory m_vertexTriangleBufferMemory = VK_NULL_HANDLE;
+
+    VkBuffer m_vertexLineBuffer = VK_NULL_HANDLE;
+    VkDeviceMemory m_vertexLineBufferMemory = VK_NULL_HANDLE;
     
     VkShaderModule m_vertShaderModule = VK_NULL_HANDLE;
     VkShaderModule m_fragShaderModule = VK_NULL_HANDLE;
     
-    VkPipelineLayout m_pipelineLayout = VK_NULL_HANDLE;
-    VkPipeline m_graphicsPipeline = VK_NULL_HANDLE;
+    VkPipelineLayout m_pipelineTriangleLayout = VK_NULL_HANDLE;
+    VkPipeline m_graphicsTrianglePipeline = VK_NULL_HANDLE;
+
+    VkPipelineLayout m_pipelineLineLayout = VK_NULL_HANDLE;
+    VkPipeline m_graphicsLinePipeline = VK_NULL_HANDLE;
     
     bool m_initialized = false;
-    bool m_pipelineCreated = false;
+    bool m_trianglePipelineCreated = false;
+    bool m_linePipelineCreated = false;
+
     
     // Store vertices for dynamic updates
-    std::vector<Vertex> m_vertices;
+    std::vector<Vertex> m_verticesTriangle;
+    std::vector<Vertex> m_verticesLine;
+
     bool m_verticesDirty = false;
 };
 

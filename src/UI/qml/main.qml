@@ -33,10 +33,6 @@ ApplicationWindow {
             id: vulkanItem
             Layout.fillWidth: true
             Layout.fillHeight: true
-            clip: {
-                console.log("height",  vulkanItem.height);
-                return true;
-            }
             Rectangle {
                 anchors.fill: parent
                 color: '#9db0c4'
