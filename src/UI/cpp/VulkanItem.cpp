@@ -1,7 +1,6 @@
 #include <cstddef>
 #include <cstdint>
-#include <qmath.h>
-#include <qquaternion.h>
+#include <cstdlib>
 #include <vulkan/vulkan.h>
 #include "VulkanItem.h"
 #include <QQuickWindow>
@@ -48,12 +47,16 @@ std::string queueFamiliesFlagsToString(VkQueueFlags flags)
 
 }
 
-// Vertex shader (SPIR-V bytecode)
+float VulkanItem::z = 1.0f;
+
 static uint32_t* vertShaderCode;
 static size_t vertShaderSize;
-// Fragment shader (SPIR-V bytecode)
+
 static uint32_t* fragShaderCode;
 static size_t fragShaderSize;
+
+static uint32_t* fragDashShaderCode;
+static size_t fragDashShaderSize;
 
 VulkanRenderNode::VulkanRenderNode(QQuickItem *item)
     : m_item(item)
@@ -65,6 +68,9 @@ VulkanRenderNode::VulkanRenderNode(QQuickItem *item)
     fragShaderCode = read_spv("shaders/frag.spv", &size);
     fragShaderSize = size;
     std::cout << "Fragment shader size: " << fragShaderSize << " bytes\n";
+    fragDashShaderCode = read_spv("shaders/frag_dash_line.spv", &size);
+    fragDashShaderSize = size;
+    std::cout << "Fragment dash shader size: " << fragShaderSize << " bytes\n";
 }
 
 VulkanRenderNode::~VulkanRenderNode()
@@ -219,9 +225,8 @@ void VulkanRenderNode::createCommandPool()
 
 void VulkanRenderNode::createLineVertexBuffer()
 {
-    // Triangle vertices with colors (position XY, color RGB)
     m_verticesLine = {
-        {{0.0f, -1.0f}, {0.2f, 0.2f, 0.7f}},  // Top - Red
+        {{0.0f, -1.0f}, {0.2f, 0.2f, 0.7f}},
         {{0.0f, 1.0f}, {0.2f, 0.2f, 0.7f}}
     };
 
@@ -315,6 +320,17 @@ void VulkanRenderNode::createShaderModules()
         return;
     }
     qDebug("Fragment shader module created: %p", m_fragShaderModule);
+
+    createInfo.codeSize = fragDashShaderSize;
+    createInfo.pCode = fragDashShaderCode;
+
+    qDebug("Creating fragment dash shader module, size: %zu bytes", fragDashShaderSize);
+    result = m_devFuncs->vkCreateShaderModule(m_device, &createInfo, nullptr, &m_fragDashShaderModule);
+    if (result != VK_SUCCESS) {
+        qWarning("Failed to create fragment dashshader module: %d", result);
+        return;
+    }
+    qDebug("Fragment dash shader module created: %p", m_fragDashShaderModule);
 }
 
 void VulkanRenderNode::createTrianglePipeline(VkRenderPass renderPass)
@@ -597,7 +613,7 @@ void VulkanRenderNode::createLinePipeline(VkRenderPass renderPass)
 
     shaderStages[1].sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
     shaderStages[1].stage = VK_SHADER_STAGE_FRAGMENT_BIT;
-    shaderStages[1].module = m_fragShaderModule;
+    shaderStages[1].module = m_fragDashShaderModule;
     shaderStages[1].pName = "main";
     shaderStages[1].pSpecializationInfo = nullptr;
 
@@ -879,6 +895,14 @@ void VulkanItem::hoverLeaveEvent(QHoverEvent *event)
     event->accept();
 }
 
+void VulkanItem::wheelEvent(QWheelEvent* event)
+{
+    float delta = event->angleDelta().ry();
+    z = delta > 0 ? z / 0.9 : z * 0.9;
+    qDebug() << "VulkanItem::z" << VulkanItem::z;
+    event->accept();
+}
+
 void VulkanRenderNode::render(const RenderState *state)
 {
     if (!m_initialized)
@@ -949,20 +973,21 @@ void VulkanRenderNode::drawTriangle(VkCommandBuffer commandBuffer)
     float time = QTime::currentTime().msecsSinceStartOfDay() % 10000;
     float angle = time;
     QMatrix4x4 model{};
-    model.rotate(angle/2, 0, 1, 0);
+    model.rotate(angle/2.0f, 0, 1, 0);
     QMatrix4x4 view{};
-    view.translate({0, 0 ,  -9.0f});
+    view.translate({0, 0 , -4.0f});
     QMatrix4x4 projection{};
-    projection.perspective(qDegreesToRadians(60), 1.0f, 0.1f, 13.f);
-    projection.data()[1 + 1*4] *= -1;
+    projection.perspective(qDegreesToRadians(90), 1.0f, 1.0f, 5.0f);
+    // projection.data()[1 + 1*4] *= -1;
     QMatrix4x4 mvp = projection * view * model;
+    mvp.scale(VulkanItem::z);
     vkCmdPushConstants(
         commandBuffer,
         m_pipelineTriangleLayout,
         VK_SHADER_STAGE_VERTEX_BIT,
         0,
         sizeof(QMatrix4x4),
-        mvp.constData()   // pointer to raw float[16]
+        mvp.constData()
     );
 
     // Bind pipeline
@@ -1081,6 +1106,11 @@ void VulkanRenderNode::releaseResources()
     }
 
     if (m_fragShaderModule != VK_NULL_HANDLE) {
+        m_devFuncs->vkDestroyShaderModule(m_device, m_fragShaderModule, nullptr);
+        m_fragShaderModule = VK_NULL_HANDLE;
+    }
+
+    if (m_fragDashShaderModule != VK_NULL_HANDLE) {
         m_devFuncs->vkDestroyShaderModule(m_device, m_fragShaderModule, nullptr);
         m_fragShaderModule = VK_NULL_HANDLE;
     }

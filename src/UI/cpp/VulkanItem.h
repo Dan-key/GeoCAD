@@ -58,6 +58,7 @@ private:
     
     VkShaderModule m_vertShaderModule = VK_NULL_HANDLE;
     VkShaderModule m_fragShaderModule = VK_NULL_HANDLE;
+    VkShaderModule m_fragDashShaderModule = VK_NULL_HANDLE;
     
     VkPipelineLayout m_pipelineTriangleLayout = VK_NULL_HANDLE;
     VkPipeline m_graphicsTrianglePipeline = VK_NULL_HANDLE;
@@ -94,6 +95,7 @@ public:
 
     // QColor triangleColor() const { return m_triangleColor; }
     // void setTriangleColor(const QColor& color);
+    static float z;
 
 protected:
     QSGNode *updatePaintNode(QSGNode *oldNode, UpdatePaintNodeData *) override;
@@ -105,6 +107,7 @@ protected:
     void hoverEnterEvent(QHoverEvent *event) override;
     void hoverMoveEvent(QHoverEvent *event) override;
     void hoverLeaveEvent(QHoverEvent *event) override;
+    void wheelEvent(QWheelEvent *event) override;
 
 signals:
     void interactiveChanged();

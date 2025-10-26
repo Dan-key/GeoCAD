@@ -53,7 +53,6 @@ foreach(infile IN LISTS SPVASM_FILES)
 endforeach()
 add_custom_target(spirv_shaders ALL DEPENDS ${SPV_OUT_FILES})
 
-# Ensure the executable depends on the shaders being built
 add_dependencies(${PROJECT_NAME} spirv_shaders)
 
 target_link_libraries(${PROJECT_NAME} Qt6::Core Qt6::Qml Qt6::Quick Vulkan::Vulkan)
