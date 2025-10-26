@@ -1111,8 +1111,8 @@ void VulkanRenderNode::releaseResources()
     }
 
     if (m_fragDashShaderModule != VK_NULL_HANDLE) {
-        m_devFuncs->vkDestroyShaderModule(m_device, m_fragShaderModule, nullptr);
-        m_fragShaderModule = VK_NULL_HANDLE;
+        m_devFuncs->vkDestroyShaderModule(m_device, m_fragDashShaderModule, nullptr);
+        m_fragDashShaderModule = VK_NULL_HANDLE;
     }
 
     if (m_vertexTriangleBuffer != VK_NULL_HANDLE) {

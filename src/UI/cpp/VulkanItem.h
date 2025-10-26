@@ -23,7 +23,6 @@ public:
     StateFlags changedStates() const override;
     RenderingFlags flags() const override;
 
-    // Add method to update vertices based on mouse input
     void updateVertexPosition(const QPointF& position);
 
 private:
