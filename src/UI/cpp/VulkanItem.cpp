@@ -22,6 +22,9 @@ void VulkanItem::mousePressEvent(QMouseEvent *event)
     if (m_renderNode && event->buttons() & Qt::LeftButton) {
         m_renderNode->updateVertexPosition(localPos);
         update();
+    } else if (m_renderNode && event->buttons() & Qt::MiddleButton) {
+        beginPos = event->position();
+        deltaPos = VulkanRenderNode::pos;
     }
 
     event->accept();
@@ -34,6 +37,9 @@ void VulkanItem::mouseMoveEvent(QMouseEvent *event)
     if (m_mousePressed && m_renderNode && event->buttons() & Qt::LeftButton) {
         m_renderNode->updateVertexPosition(localPos);
         update();
+    } else if (m_mousePressed && m_renderNode && event->buttons() & Qt::MiddleButton) {
+        auto delta = event->position() - beginPos;
+        VulkanRenderNode::pos = deltaPos + delta;
     }
 
     emit mouseMoved(localPos.x(), localPos.y());
@@ -47,6 +53,8 @@ void VulkanItem::mouseReleaseEvent(QMouseEvent *event)
 
     qDebug() << "Mouse released at:" << localPos;
     emit mouseReleased(localPos.x(), localPos.y());
+    beginPos = {0.0, 0.0};
+    deltaPos = {0.0, 0.0};
 
     event->accept();
 }

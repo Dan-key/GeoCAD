@@ -5,6 +5,7 @@
 #include <QVulkanInstance>
 #include <QVulkanFunctions>
 #include <QVulkanDeviceFunctions>
+#include <qpoint.h>
 
 #include "VulkanRenderNode.h"
 
@@ -53,4 +54,6 @@ private:
     // bool m_interactive = true;
     // QColor m_triangleColor = Qt::red;
     bool m_mousePressed = false;
+    QPointF deltaPos;
+    QPointF beginPos;
 };

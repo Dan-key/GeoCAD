@@ -1,3 +1,4 @@
+#include <qpoint.h>
 #include <vulkan/vulkan.h>
 
 #include "VulkanRenderNode.h"
@@ -44,6 +45,7 @@ std::string queueFamiliesFlagsToString(VkQueueFlags flags)
 }
 
 float VulkanRenderNode::z = 1.0f;
+QPointF VulkanRenderNode::pos = {0, 0};
 
 static uint32_t* vertShaderCode;
 static size_t vertShaderSize;
@@ -176,6 +178,12 @@ void VulkanRenderNode::initVulkan()
         return;
     }
 
+    createNetVertexBuffer();
+    if (m_vertexNetBuffer == VK_NULL_HANDLE) {
+        qWarning("Failed to create net vertex buffer!");
+        return;
+    }
+ 
     createShaderModules();
     if (m_vertShaderModule == VK_NULL_HANDLE || m_fragShaderModule == VK_NULL_HANDLE) {
         qWarning("Failed to create shader modules!");
@@ -222,10 +230,10 @@ void VulkanRenderNode::createCommandPool()
 void VulkanRenderNode::createLineVertexBuffer()
 {
     m_verticesLine = {
-        {{0.0f, -1.0f}, {0.2f, 0.2f, 0.7f}},
-        {{0.0f, 1.0f}, {0.2f, 0.2f, 0.7f}},
-        {{-1.0f, 0.0f}, {0.2f, 0.2f, 0.7f}},
-        {{1.0f, 0.0f}, {0.2f, 0.2f, 0.7f}}
+        {{0.0f, -100.0f}, {0.2f, 0.2f, 0.7f}},
+        {{0.0f, 100.0f}, {0.2f, 0.2f, 0.7f}},
+        {{-100.0f, 0.0f}, {0.2f, 0.2f, 0.7f}},
+        {{100.0f, 0.0f}, {0.2f, 0.2f, 0.7f}}
     };
 
     VkBufferCreateInfo bufferInfo = {};
@@ -252,6 +260,43 @@ void VulkanRenderNode::createLineVertexBuffer()
     m_devFuncs->vkMapMemory(m_device, m_vertexLineBufferMemory, 0, bufferInfo.size, 0, &data);
     memcpy(data, m_verticesLine.data() , m_verticesLine.size() * sizeof(decltype(m_verticesLine)::value_type));
     m_devFuncs->vkUnmapMemory(m_device, m_vertexLineBufferMemory);
+}
+
+void VulkanRenderNode::createNetVertexBuffer()
+{
+    //vertical
+    for (float i = -100; i <= 100; i+=0.1) {
+        m_verticesNet.push_back({{i, 100.0f}, {0.2f, 0.2f, 0.6f}});
+        m_verticesNet.push_back({{i, -100.0f}, {0.2f, 0.2f, 0.6f}});
+
+        m_verticesNet.push_back({{100.0f, i}, {0.2f, 0.2f, 0.6f}});
+        m_verticesNet.push_back({{-100.0f, i}, {0.2f, 0.2f, 0.6f}});
+    }
+
+    VkBufferCreateInfo bufferInfo = {};
+    bufferInfo.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
+    bufferInfo.size = m_verticesNet.size() * sizeof(decltype(m_verticesNet)::value_type);
+    bufferInfo.usage = VK_BUFFER_USAGE_VERTEX_BUFFER_BIT;
+    bufferInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
+
+    m_devFuncs->vkCreateBuffer(m_device, &bufferInfo, nullptr, &m_vertexNetBuffer);
+
+    VkMemoryRequirements memRequirements;
+    m_devFuncs->vkGetBufferMemoryRequirements(m_device, m_vertexNetBuffer, &memRequirements);
+
+    VkMemoryAllocateInfo allocInfo = {};
+    allocInfo.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
+    allocInfo.allocationSize = memRequirements.size;
+    allocInfo.memoryTypeIndex = findMemoryType(m_physicalDevice, memRequirements.memoryTypeBits,
+        VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
+
+    m_devFuncs->vkAllocateMemory(m_device, &allocInfo, nullptr, &m_vertexNetBufferMemory);
+    m_devFuncs->vkBindBufferMemory(m_device, m_vertexNetBuffer, m_vertexNetBufferMemory, 0);
+
+    void* data;
+    m_devFuncs->vkMapMemory(m_device, m_vertexNetBufferMemory, 0, bufferInfo.size, 0, &data);
+    memcpy(data, m_verticesNet.data() , m_verticesNet.size() * sizeof(decltype(m_verticesNet)::value_type));
+    m_devFuncs->vkUnmapMemory(m_device, m_vertexNetBufferMemory);
 }
 
 void VulkanRenderNode::createTriangleVertexBuffer()
@@ -492,15 +537,14 @@ void VulkanRenderNode::createTrianglePipeline(VkRenderPass renderPass)
     // Dynamic state
     VkDynamicState dynamicStates[] = {
         VK_DYNAMIC_STATE_VIEWPORT, 
-        VK_DYNAMIC_STATE_SCISSOR,
-        VK_DYNAMIC_STATE_LINE_WIDTH
+        VK_DYNAMIC_STATE_SCISSOR
     };
 
     VkPipelineDynamicStateCreateInfo dynamicState = {};
     dynamicState.sType = VK_STRUCTURE_TYPE_PIPELINE_DYNAMIC_STATE_CREATE_INFO;
     dynamicState.pNext = nullptr;
     dynamicState.flags = 0;
-    dynamicState.dynamicStateCount = 3;
+    dynamicState.dynamicStateCount = sizeof(dynamicStates)/sizeof(dynamicStates[0]);
     dynamicState.pDynamicStates = dynamicStates;
 
     // Pipeline layout (create if not exists)
@@ -892,7 +936,7 @@ void VulkanRenderNode::recordCommandBuffer(const RenderState *state)
 
     // Use Qt's command buffer instead of our own
     VkCommandBuffer commandBuffer = qtCommandBuffer;
-
+    drawNet(commandBuffer);
     drawLine(commandBuffer);
     drawTriangle(commandBuffer);
 }
@@ -904,14 +948,16 @@ void VulkanRenderNode::drawTriangle(VkCommandBuffer commandBuffer)
     float time = QTime::currentTime().msecsSinceStartOfDay() % 10000;
     float angle = time;
     QMatrix4x4 model{};
+    // model.translate({(float)(pos.x()/window->size().width())/(z*20.f), (float)(pos.y()/window->size().height())/(z*20.f), 0});
     model.rotate(angle/2.0f, 0, 1, 0);
     QMatrix4x4 view{};
-    view.translate({0, 0 , -4.0f});
+    view.translate({0.0f, 0.0f, -4.0f});
     QMatrix4x4 projection{};
     projection.perspective(qDegreesToRadians(90), 1.0f, 1.0f, 5.0f);
     // projection.data()[1 + 1*4] *= -1;
     QMatrix4x4 mvp = projection * view * model;
     mvp.scale(VulkanRenderNode::z);
+
     vkCmdPushConstants(
         commandBuffer,
         m_pipelineTriangleLayout,
@@ -929,7 +975,7 @@ void VulkanRenderNode::drawTriangle(VkCommandBuffer commandBuffer)
     qreal dpr = window->devicePixelRatio();
     rect.setWidth(dpr*rect.width());
     rect.setHeight(dpr*rect.height());
-
+    _viewPort= rect;
     VkViewport viewport = {};
     viewport.x = rect.x();
     viewport.y = rect.y();
@@ -954,24 +1000,82 @@ void VulkanRenderNode::drawTriangle(VkCommandBuffer commandBuffer)
 
 }
 
-void VulkanRenderNode::drawLine(VkCommandBuffer commandBuffer)
+void VulkanRenderNode::drawNet(VkCommandBuffer commandBuffer)
 {
     QQuickWindow *window = m_item->window();
 
-    QMatrix4x4 i = {};
+    float time = QTime::currentTime().msecsSinceStartOfDay() % 10000;
+    float angle = time;
+
+    QMatrix4x4 mvp = {};
+    static float localZ = 1;
+    // static float localMax = 1.0f;
+    // if (localZ < 0.3) {
+    //     localMax = 1 / z;
+    // }
+    // localZ = z * localMax;
+    mvp.scale(localZ);
+    mvp.translate((float)(pos.x()/window->size().width())/localZ, (float)(pos.y()/window->size().height())/localZ, 0);
     vkCmdPushConstants(
         commandBuffer,
-        m_pipelineTriangleLayout,
+        m_pipelineLineLayout,
         VK_SHADER_STAGE_VERTEX_BIT,
         0,
         sizeof(QMatrix4x4),
-        i.constData()   // pointer to raw float[16]
+        mvp.constData()
     );
 
     // Bind pipeline
     m_devFuncs->vkCmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, m_graphicsLinePipeline);
 
     // Set viewport and scissor
+    QRectF rect = matrix()->mapRect(QRectF(m_item->x(), m_item->y(), m_item->width(), m_item->height()));
+    qreal dpr = window->devicePixelRatio();
+    rect.setWidth(dpr*rect.width());
+    rect.setHeight(dpr*rect.height());
+    _viewPort= rect;
+    VkViewport viewport = {};
+    viewport.x = rect.x();
+    viewport.y = rect.y();
+    viewport.width = rect.width();
+    viewport.height = rect.height();
+    viewport.minDepth = 0.0f;
+    viewport.maxDepth = 1.0f;
+    m_devFuncs->vkCmdSetViewport(commandBuffer, 0, 1, &viewport);
+
+    VkRect2D scissor = {};
+    scissor.offset = {(int32_t)rect.x(), (int32_t)rect.y()};
+    scissor.extent = {(uint32_t)rect.width(), (uint32_t)rect.height()};
+    m_devFuncs->vkCmdSetScissor(commandBuffer, 0, 1, &scissor);
+
+    m_devFuncs->vkCmdSetLineWidth(commandBuffer, 1);
+
+    VkBuffer vertexBuffers[] = {m_vertexNetBuffer};
+    VkDeviceSize offsets[] = {0};
+    m_devFuncs->vkCmdBindVertexBuffers(commandBuffer, 0, 1, vertexBuffers, offsets);
+
+    m_devFuncs->vkCmdDraw(commandBuffer, m_verticesNet.size(), 1, 0, 0);
+
+}
+
+void VulkanRenderNode::drawLine(VkCommandBuffer commandBuffer)
+{
+    QQuickWindow *window = m_item->window();
+
+    QMatrix4x4 i = {};
+    i.translate((float)(pos.x()/window->size().width()), (float)(pos.y()/window->size().height()), 0);
+
+    vkCmdPushConstants(
+        commandBuffer,
+        m_pipelineTriangleLayout,
+        VK_SHADER_STAGE_VERTEX_BIT,
+        0,
+        sizeof(QMatrix4x4),
+        i.constData()
+    );
+
+    m_devFuncs->vkCmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, m_graphicsLinePipeline);
+
     QRectF rect = matrix()->mapRect(QRectF(m_item->x(), m_item->y(), m_item->width(), m_item->height()));
     qreal dpr = window->devicePixelRatio();
     rect.setWidth(dpr*rect.width());
@@ -995,14 +1099,12 @@ void VulkanRenderNode::drawLine(VkCommandBuffer commandBuffer)
 
     m_devFuncs->vkCmdSetScissor(commandBuffer, 1, 1, &scissor);
 
-    // Bind vertex buffer
     VkBuffer vertexLineBuffers[] = {m_vertexLineBuffer};
-    m_devFuncs->vkCmdSetLineWidth(commandBuffer, 2);
+    m_devFuncs->vkCmdSetLineWidth(commandBuffer, 5);
     VkDeviceSize offsets[] = {0};
 
     m_devFuncs->vkCmdBindVertexBuffers(commandBuffer, 0, 1, vertexLineBuffers, offsets);
 
-    // Draw - this is now valid because we're in Qt's render pass
     m_devFuncs->vkCmdDraw(commandBuffer, 4, 1, 0, 0);
 }
 
@@ -1064,6 +1166,16 @@ void VulkanRenderNode::releaseResources()
     if (m_vertexLineBufferMemory != VK_NULL_HANDLE) {
         m_devFuncs->vkFreeMemory(m_device, m_vertexLineBufferMemory, nullptr);
         m_vertexLineBufferMemory = VK_NULL_HANDLE;
+    }
+
+    if (m_vertexNetBuffer != VK_NULL_HANDLE) {
+        m_devFuncs->vkDestroyBuffer(m_device, m_vertexNetBuffer, nullptr);
+        m_vertexNetBuffer = VK_NULL_HANDLE;
+    }
+
+    if (m_vertexNetBufferMemory != VK_NULL_HANDLE) {
+        m_devFuncs->vkFreeMemory(m_device, m_vertexNetBufferMemory, nullptr);
+        m_vertexNetBufferMemory = VK_NULL_HANDLE;
     }
 
     if (m_commandBuffer != VK_NULL_HANDLE && m_commandPool != VK_NULL_HANDLE) {

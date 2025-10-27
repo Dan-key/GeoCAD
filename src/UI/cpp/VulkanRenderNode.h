@@ -5,6 +5,8 @@
 #include <QVulkanInstance>
 #include <QVulkanFunctions>
 #include <QVulkanDeviceFunctions>
+#include <qpoint.h>
+#include <qvectornd.h>
 
 #include "Vertex.h"
 
@@ -22,11 +24,13 @@ public:
     void updateVertexPosition(const QPointF& position);
 
     static float z;
+    static QPointF pos;
 private:
     void initVulkan();
     void createCommandPool();
     void createTriangleVertexBuffer();
     void createLineVertexBuffer();
+    void createNetVertexBuffer();
     void createShaderModules();
     void createTrianglePipeline(VkRenderPass renderPass);
     void createLinePipeline(VkRenderPass renderPass);
@@ -35,6 +39,7 @@ private:
 
     void drawTriangle(VkCommandBuffer);
     void drawLine(VkCommandBuffer);
+    void drawNet(VkCommandBuffer);
 
     QQuickItem *m_item;
     QVulkanInstance *m_vulkanInstance = nullptr;
@@ -51,6 +56,9 @@ private:
 
     VkBuffer m_vertexLineBuffer = VK_NULL_HANDLE;
     VkDeviceMemory m_vertexLineBufferMemory = VK_NULL_HANDLE;
+
+    VkBuffer m_vertexNetBuffer = VK_NULL_HANDLE;
+    VkDeviceMemory m_vertexNetBufferMemory = VK_NULL_HANDLE;
     
     VkShaderModule m_vertShaderModule = VK_NULL_HANDLE;
     VkShaderModule m_fragShaderModule = VK_NULL_HANDLE;
@@ -70,6 +78,9 @@ private:
     // Store vertices for dynamic updates
     std::vector<Vertex> m_verticesTriangle;
     std::vector<Vertex> m_verticesLine;
+    std::vector<Vertex> m_verticesNet;
+
+    QRectF _viewPort {};
 
     bool m_verticesDirty = false;
 };
