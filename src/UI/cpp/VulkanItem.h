@@ -5,6 +5,7 @@
 #include <QVulkanInstance>
 #include <QVulkanFunctions>
 #include <QVulkanDeviceFunctions>
+#include <qevent.h>
 #include <qpoint.h>
 
 #include "VulkanRenderNode.h"
@@ -40,6 +41,7 @@ protected:
     void hoverMoveEvent(QHoverEvent *event) override;
     void hoverLeaveEvent(QHoverEvent *event) override;
     void wheelEvent(QWheelEvent *event) override;
+    void keyPressEvent(QKeyEvent* event) override;
 
 signals:
     void interactiveChanged();
@@ -56,4 +58,10 @@ private:
     bool m_mousePressed = false;
     QPointF deltaPos;
     QPointF beginPos;
+    bool isLineAdding = false;
+
+    QPointF addLineStart;
+    bool isSecondPoint = false;
+public slots:
+    void addingLine();
 };

@@ -21,11 +21,24 @@ ApplicationWindow {
             Layout.fillWidth: true
             height: 50
             color: "#2c3e50"
-            Text {
-                anchors.centerIn: parent
-                text: "GeoCAD Vulkan Application"
-                color: "white"
-                font.pixelSize: 20
+            Button {
+                text: "addLine"
+                onClicked: {
+                    mainWindow.addLine();
+                    vulkanItem.addingLine();
+                }
+                contentItem: Rectangle{
+                    id: rect
+                    border.width: 1
+                    border.color: '#1a7a02'
+                    color: '#2dcb05'
+                    Text{
+                        anchors.centerIn: parent
+                        font.pixelSize: 10
+                        color: "white" 
+                        text : parent.parent.text
+                    }
+                }
             }
         }
         spacing: 0
@@ -39,6 +52,9 @@ ApplicationWindow {
                 border.color: "white"
                 border.width: 2
             }
+            // Component.onCompleted: {
+            //     vulkanItem.addingLine.connect(mainWindow.lineSignal);
+            // } 
         }
     }
 }

@@ -3,6 +3,7 @@
 #include <iostream>
 #include <QtQml>
 #include <vulkan/vulkan.h>
+#include "UI/cpp/MainWindow.h"
 #include "UI/cpp/VulkanItem.h"
 #include <QQuickWindow>
 
@@ -37,12 +38,15 @@ int main(int argc, char *argv[])
     QQuickWindow::setGraphicsApi(QSGRendererInterface::VulkanRhi);
     qmlRegisterType<VulkanItem>("VulkanApp", 1, 0, "VulkanItem");
 
+    MainWindow* mainWindow = new MainWindow;
+
+
     QQmlApplicationEngine engine;
     engine.load(QUrl(QStringLiteral("qrc:/src/UI/qml/main.qml")));
 
     if (engine.rootObjects().isEmpty())
         return -1;
-
+    engine.rootContext()->setContextProperty(QStringLiteral("mainWindow"), mainWindow);
     QQuickWindow *window = qobject_cast<QQuickWindow *>(engine.rootObjects().first());
     if (window) {
         window->setVulkanInstance(&inst);

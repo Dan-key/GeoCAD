@@ -5,10 +5,8 @@
 #include <QVulkanInstance>
 #include <QVulkanFunctions>
 #include <QVulkanDeviceFunctions>
-#include <qpoint.h>
-#include <qvectornd.h>
 
-#include "Vertex.h"
+#include "Line.h"
 
 class VulkanRenderNode : public QSGRenderNode
 {
@@ -22,6 +20,8 @@ public:
     RenderingFlags flags() const override;
 
     void updateVertexPosition(const QPointF& position);
+    void addLine(const Line& line);
+    void updateLine(const Line& line);
 
     static float z;
     static QPointF pos;
@@ -31,15 +31,19 @@ private:
     void createTriangleVertexBuffer();
     void createLineVertexBuffer();
     void createNetVertexBuffer();
+    void createAddedLinesVertexBuffer();
+
     void createShaderModules();
     void createTrianglePipeline(VkRenderPass renderPass);
     void createLinePipeline(VkRenderPass renderPass);
     void recordCommandBuffer(const RenderState *state);
     void updateVertexBuffer();
+    void updateVertexAddedLinesBuffer();
 
     void drawTriangle(VkCommandBuffer);
     void drawLine(VkCommandBuffer);
     void drawNet(VkCommandBuffer);
+    void drawAddedLines(VkCommandBuffer);
 
     QQuickItem *m_item;
     QVulkanInstance *m_vulkanInstance = nullptr;
@@ -59,6 +63,9 @@ private:
 
     VkBuffer m_vertexNetBuffer = VK_NULL_HANDLE;
     VkDeviceMemory m_vertexNetBufferMemory = VK_NULL_HANDLE;
+
+    VkBuffer m_vertexAddedLinesBuffer = VK_NULL_HANDLE;
+    VkDeviceMemory m_vertexAddedLinesBufferMemory = VK_NULL_HANDLE;
     
     VkShaderModule m_vertShaderModule = VK_NULL_HANDLE;
     VkShaderModule m_fragShaderModule = VK_NULL_HANDLE;
@@ -69,18 +76,20 @@ private:
 
     VkPipelineLayout m_pipelineLineLayout = VK_NULL_HANDLE;
     VkPipeline m_graphicsLinePipeline = VK_NULL_HANDLE;
-    
+
     bool m_initialized = false;
     bool m_trianglePipelineCreated = false;
     bool m_linePipelineCreated = false;
 
-    
     // Store vertices for dynamic updates
     std::vector<Vertex> m_verticesTriangle;
     std::vector<Vertex> m_verticesLine;
     std::vector<Vertex> m_verticesNet;
+    std::vector<Line> m_verticesAddedLines;
 
     QRectF _viewPort {};
 
     bool m_verticesDirty = false;
+    bool m_verticesAddedLinesDirty = true;
+
 };
