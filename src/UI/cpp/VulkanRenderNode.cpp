@@ -1040,8 +1040,8 @@ void VulkanRenderNode::drawTriangle(VkCommandBuffer commandBuffer)
     rect.setHeight(dpr*rect.height());
     _viewPort= rect;
     VkViewport viewport = {};
-    viewport.x = rect.x();
-    viewport.y = rect.y();
+    viewport.x = rect.x() * dpr;
+    viewport.y = rect.y() * dpr;
     viewport.width = rect.width();
     viewport.height = rect.height();
     viewport.minDepth = 0.0f;
@@ -1098,8 +1098,8 @@ void VulkanRenderNode::drawNet(VkCommandBuffer commandBuffer)
     rect.setHeight(dpr*rect.height());
     _viewPort= rect;
     VkViewport viewport = {};
-    viewport.x = rect.x();
-    viewport.y = rect.y();
+    viewport.x = rect.x() * dpr;
+    viewport.y = rect.y() * dpr;
     viewport.width = rect.width();
     viewport.height = rect.height();
     viewport.minDepth = 0.0f;
@@ -1153,8 +1153,8 @@ void VulkanRenderNode::drawAddedLines(VkCommandBuffer commandBuffer)
     rect.setHeight(dpr*rect.height());
     _viewPort= rect;
     VkViewport viewport = {};
-    viewport.x = rect.x();
-    viewport.y = rect.y();
+    viewport.x = rect.x() * dpr;
+    viewport.y = rect.y() * dpr;
     viewport.width = rect.width();
     viewport.height = rect.height();
     viewport.minDepth = 0.0f;
@@ -1193,15 +1193,13 @@ void VulkanRenderNode::drawLine(VkCommandBuffer commandBuffer)
     );
 
     m_devFuncs->vkCmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, m_graphicsLinePipeline);
-    auto x = m_item->x();
-    auto y = m_item->y();
     QRectF rect = matrix()->mapRect(QRectF(0, 0, m_item->width(), m_item->height()));
     qreal dpr = window->devicePixelRatio();
     rect.setWidth(dpr*rect.width());
     rect.setHeight(dpr*rect.height());
 
     VkViewport viewport = {};
-    viewport.x = rect.x()*dpr;
+    viewport.x = rect.x() * dpr;
     viewport.y = rect.y() * dpr;
     viewport.width = rect.width();
     viewport.height = rect.height();
