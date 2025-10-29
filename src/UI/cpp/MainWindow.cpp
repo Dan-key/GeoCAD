@@ -8,6 +8,8 @@ MainWindow::MainWindow(QObject* parent) :
 
 void MainWindow::addLine()
 {
-    QGuiApplication::setOverrideCursor(QCursor(Qt::CrossCursor));
-    emit lineSignal();
+    if (!QGuiApplication::overrideCursor() || QGuiApplication::overrideCursor()->shape() != Qt::CrossCursor) {
+        QGuiApplication::setOverrideCursor(QCursor(Qt::CrossCursor));
+        emit lineSignal();
+    } 
 }

@@ -12,7 +12,7 @@
 #include <iostream>
 #include <QTimer>
 
-#include "Vertex.h"
+#include "Geometry/Vertex.h"
 #include "VulkanRenderNode.h"
 
 void VulkanItem::mousePressEvent(QMouseEvent *event)
@@ -55,9 +55,9 @@ void VulkanItem::mouseMoveEvent(QMouseEvent *event)
 
         float endXpos = ((localPos.x()) * 2 / itemSize.width() - 1) / VulkanRenderNode::z;
         float endYpos = ((localPos.y()) * 2 / itemSize.height() - 1) / VulkanRenderNode::z;
-        Line line = {
-            Vertex{(float)addLineStart.x(), (float)addLineStart.y(), 0., 0., 0.}, 
-            Vertex{endXpos, endYpos, 0., 0., 0.}
+        Geometry::Line line = {
+            Geometry::Vertex{(float)addLineStart.x(), (float)addLineStart.y(), 0., 0., 0.}, 
+            Geometry::Vertex{endXpos, endYpos, 0., 0., 0.}
         };
         if (isSecondPoint) {
             m_renderNode->updateLine(line);
@@ -97,7 +97,9 @@ void VulkanItem::mouseReleaseEvent(QMouseEvent *event)
 
         qDebug() << "endLineStart" << QPointF{endXpos, endXpos} << "eventposition" << event->position();
 
-        Line line = {Vertex{(float)addLineStart.x(), (float)(addLineStart.y()), 0.0, 0.0, 0.0}, Vertex{endXpos, (float)endYpos, 0.0, 0.0, 0.0}};
+        Geometry::Line line = {
+            Geometry::Vertex{(float)addLineStart.x(), (float)(addLineStart.y()),0.0, 0.0, 0.0},
+            Geometry::Vertex{endXpos, endYpos, 0.0, 0.0, 0.0}};
         m_renderNode->addLine(line);
         isSecondPoint = false;
         isLineAdding = false;

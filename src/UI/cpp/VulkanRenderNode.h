@@ -6,7 +6,7 @@
 #include <QVulkanFunctions>
 #include <QVulkanDeviceFunctions>
 
-#include "Line.h"
+#include "Geometry/Line.h"
 
 class VulkanRenderNode : public QSGRenderNode
 {
@@ -20,8 +20,8 @@ public:
     RenderingFlags flags() const override;
 
     void updateVertexPosition(const QPointF& position);
-    void addLine(const Line& line);
-    void updateLine(const Line& line);
+    void addLine(const Geometry::Line& line);
+    void updateLine(const Geometry::Line& line);
 
     static float z;
     static QPointF pos;
@@ -82,10 +82,10 @@ private:
     bool m_linePipelineCreated = false;
 
     // Store vertices for dynamic updates
-    std::vector<Vertex> m_verticesTriangle;
-    std::vector<Vertex> m_verticesLine;
-    std::vector<Vertex> m_verticesNet;
-    std::vector<Line> m_verticesAddedLines;
+    std::vector<Geometry::Vertex> m_verticesTriangle;
+    std::vector<Geometry::Vertex> m_verticesLine;
+    std::vector<Geometry::Vertex> m_verticesNet;
+    std::vector<Geometry::Line> m_verticesAddedLines;
 
     QRectF _viewPort {};
 

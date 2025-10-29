@@ -1,12 +1,10 @@
-#include <qpoint.h>
 #include <vulkan/vulkan.h>
 
-#include "VulkanRenderNode.h"
-#include "Line.h"
+#include <QSGRendererInterface>
 #include <iostream>
 #include <QQuickWindow>
-#include <QSGRendererInterface>
 
+#include "VulkanRenderNode.h"
 
 namespace {
 
@@ -372,13 +370,13 @@ void VulkanRenderNode::createTriangleVertexBuffer()
     m_devFuncs->vkUnmapMemory(m_device, m_vertexTriangleBufferMemory);
 }
 
-void VulkanRenderNode::addLine(const Line& line)
+void VulkanRenderNode::addLine(const Geometry::Line& line)
 {
     m_verticesAddedLines.push_back(line);
     updateVertexAddedLinesBuffer();
 }
 
-void VulkanRenderNode::updateLine(const Line& line)
+void VulkanRenderNode::updateLine(const Geometry::Line& line)
 {
     m_verticesAddedLines[m_verticesAddedLines.size() -1] = line;
     updateVertexAddedLinesBuffer();
@@ -476,19 +474,19 @@ void VulkanRenderNode::createTrianglePipeline(VkRenderPass renderPass)
     // Vertex input
     VkVertexInputBindingDescription bindingDescription = {};
     bindingDescription.binding = 0;
-    bindingDescription.stride = sizeof(Vertex);
+    bindingDescription.stride = sizeof(Geometry::Vertex);
     bindingDescription.inputRate = VK_VERTEX_INPUT_RATE_VERTEX;
 
     VkVertexInputAttributeDescription attributeDescriptions[2] = {};
     attributeDescriptions[0].binding = 0;
     attributeDescriptions[0].location = 0;
     attributeDescriptions[0].format = VK_FORMAT_R32G32_SFLOAT;
-    attributeDescriptions[0].offset = offsetof(Vertex, pos);
+    attributeDescriptions[0].offset = offsetof(Geometry::Vertex, pos);
 
     attributeDescriptions[1].binding = 0;
     attributeDescriptions[1].location = 1;
     attributeDescriptions[1].format = VK_FORMAT_R32G32B32_SFLOAT;
-    attributeDescriptions[1].offset = offsetof(Vertex, color);
+    attributeDescriptions[1].offset = offsetof(Geometry::Vertex, color);
 
     VkPipelineVertexInputStateCreateInfo vertexInputInfo = {};
     vertexInputInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO;
@@ -711,19 +709,19 @@ void VulkanRenderNode::createLinePipeline(VkRenderPass renderPass)
     // Vertex input
     VkVertexInputBindingDescription bindingDescription = {};
     bindingDescription.binding = 0;
-    bindingDescription.stride = sizeof(Vertex);
+    bindingDescription.stride = sizeof(Geometry::Vertex);
     bindingDescription.inputRate = VK_VERTEX_INPUT_RATE_VERTEX;
 
     VkVertexInputAttributeDescription attributeDescriptions[2] = {};
     attributeDescriptions[0].binding = 0;
     attributeDescriptions[0].location = 0;
     attributeDescriptions[0].format = VK_FORMAT_R32G32_SFLOAT;
-    attributeDescriptions[0].offset = offsetof(Vertex, pos);
+    attributeDescriptions[0].offset = offsetof(Geometry::Vertex, pos);
 
     attributeDescriptions[1].binding = 0;
     attributeDescriptions[1].location = 1;
     attributeDescriptions[1].format = VK_FORMAT_R32G32B32_SFLOAT;
-    attributeDescriptions[1].offset = offsetof(Vertex, color);
+    attributeDescriptions[1].offset = offsetof(Geometry::Vertex, color);
 
     VkPipelineVertexInputStateCreateInfo vertexInputInfo = {};
     vertexInputInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO;
@@ -901,9 +899,9 @@ void VulkanRenderNode::updateVertexBuffer()
 
     void* data;
     VkResult result = m_devFuncs->vkMapMemory(m_device, m_vertexTriangleBufferMemory, 0, 
-                                             sizeof(Vertex) * m_verticesTriangle.size(), 0, &data);
+                                             sizeof(Geometry::Vertex) * m_verticesTriangle.size(), 0, &data);
     if (result == VK_SUCCESS) {
-        memcpy(data, m_verticesTriangle.data(), sizeof(Vertex) * m_verticesTriangle.size());
+        memcpy(data, m_verticesTriangle.data(), sizeof(Geometry::Vertex) * m_verticesTriangle.size());
         m_devFuncs->vkUnmapMemory(m_device, m_vertexTriangleBufferMemory);
         m_verticesDirty = false;
     }
@@ -916,9 +914,9 @@ void VulkanRenderNode::updateVertexAddedLinesBuffer()
 
     void* data;
     VkResult result = m_devFuncs->vkMapMemory(m_device, m_vertexAddedLinesBufferMemory, 0, 
-                                             sizeof(Line) * m_verticesAddedLines.size(), 0, &data);
+                                             sizeof(Geometry::Line) * m_verticesAddedLines.size(), 0, &data);
     if (result == VK_SUCCESS) {
-        memcpy(data, m_verticesAddedLines.data(), sizeof(Line) * m_verticesAddedLines.size());
+        memcpy(data, m_verticesAddedLines.data(), sizeof(Geometry::Line) * m_verticesAddedLines.size());
         m_devFuncs->vkUnmapMemory(m_device, m_vertexAddedLinesBufferMemory);
         m_verticesAddedLinesDirty = false;
     }
@@ -1004,7 +1002,6 @@ void VulkanRenderNode::recordCommandBuffer(const RenderState *state)
     drawLine(commandBuffer);
     // drawTriangle(commandBuffer);
     drawAddedLines(commandBuffer);
-
 }
 
 void VulkanRenderNode::drawTriangle(VkCommandBuffer commandBuffer)
@@ -1037,7 +1034,7 @@ void VulkanRenderNode::drawTriangle(VkCommandBuffer commandBuffer)
     m_devFuncs->vkCmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, m_graphicsTrianglePipeline);
 
     // Set viewport and scissor
-    QRectF rect = matrix()->mapRect(QRectF(m_item->x(), m_item->y(), m_item->width(), m_item->height()));
+    QRectF rect = matrix()->mapRect(QRectF(0, 0, m_item->width(), m_item->height()));
     qreal dpr = window->devicePixelRatio();
     rect.setWidth(dpr*rect.width());
     rect.setHeight(dpr*rect.height());
@@ -1095,7 +1092,7 @@ void VulkanRenderNode::drawNet(VkCommandBuffer commandBuffer)
     m_devFuncs->vkCmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, m_graphicsLinePipeline);
 
     // Set viewport and scissor
-    QRectF rect = matrix()->mapRect(QRectF(m_item->x(), m_item->y(), m_item->width(), m_item->height()));
+    QRectF rect = matrix()->mapRect(QRectF(0, 0, m_item->width(), m_item->height()));
     qreal dpr = window->devicePixelRatio();
     rect.setWidth(dpr*rect.width());
     rect.setHeight(dpr*rect.height());
@@ -1150,7 +1147,7 @@ void VulkanRenderNode::drawAddedLines(VkCommandBuffer commandBuffer)
     m_devFuncs->vkCmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, m_graphicsLinePipeline);
 
     // Set viewport and scissor
-    QRectF rect = matrix()->mapRect(QRectF(m_item->x(), m_item->y(), m_item->width(), m_item->height()));
+    QRectF rect = matrix()->mapRect(QRectF(0, 0, m_item->width(), m_item->height()));
     qreal dpr = window->devicePixelRatio();
     rect.setWidth(dpr*rect.width());
     rect.setHeight(dpr*rect.height());
@@ -1196,15 +1193,16 @@ void VulkanRenderNode::drawLine(VkCommandBuffer commandBuffer)
     );
 
     m_devFuncs->vkCmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, m_graphicsLinePipeline);
-
-    QRectF rect = matrix()->mapRect(QRectF(m_item->x(), m_item->y(), m_item->width(), m_item->height()));
+    auto x = m_item->x();
+    auto y = m_item->y();
+    QRectF rect = matrix()->mapRect(QRectF(0, 0, m_item->width(), m_item->height()));
     qreal dpr = window->devicePixelRatio();
     rect.setWidth(dpr*rect.width());
     rect.setHeight(dpr*rect.height());
 
     VkViewport viewport = {};
-    viewport.x = rect.x();
-    viewport.y = rect.y();
+    viewport.x = rect.x()*dpr;
+    viewport.y = rect.y() * dpr;
     viewport.width = rect.width();
     viewport.height = rect.height();
     viewport.minDepth = 0.0f;
