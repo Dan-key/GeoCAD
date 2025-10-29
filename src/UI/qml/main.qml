@@ -27,9 +27,12 @@ ApplicationWindow {
                     mainWindow.addLine();
                     vulkanItem.addingLine();
                 }
+                width: 70
+                height: 30
                 contentItem: Rectangle{
                     id: rect
-                    border.width: 1
+                    anchors.fill: parent
+                    border.width: 2
                     border.color: '#1a7a02'
                     color: '#2dcb05'
                     Text{
