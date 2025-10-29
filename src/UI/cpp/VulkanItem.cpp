@@ -1,8 +1,6 @@
 #include <cstddef>
 #include <cstdint>
 #include <cstdlib>
-#include <qdebug.h>
-#include <qnamespace.h>
 #include <vulkan/vulkan.h>
 #include "VulkanItem.h"
 #include <QQuickWindow>
@@ -23,12 +21,19 @@ void VulkanItem::mousePressEvent(QMouseEvent *event)
     qDebug() << "Mouse pressed at:" << localPos << "buttons" << event->buttons();
     emit mousePressed(localPos.x(), localPos.y());
     if (isLineAdding) {
+        if (event->buttons() & Qt::RightButton) {
+            isLineAdding = false;
+            isSecondPoint = false;
+            QGuiApplication::restoreOverrideCursor();
+            event->accept();
+            return;
+        }
         if (!isSecondPoint) {
             auto itemSize = size();
 
             addLineStart = QPointF(
-                (((event->position().x()) * 2 / (itemSize.width()) - 1) / VulkanRenderNode::z),
-                (((event->position().y()) * 2 / (itemSize.height()) - 1) / VulkanRenderNode::z)
+                (((event->position().x() - VulkanRenderNode::pos.x() / 2) * 2 / (itemSize.width()) - 1) / VulkanRenderNode::z),
+                (((event->position().y() - VulkanRenderNode::pos.y() / 2) * 2 / (itemSize.height()) - 1) / VulkanRenderNode::z)
             );
             qDebug() << "addLineStart" << addLineStart << "eventposition" << event->position();
             // isSecondPoint = true;
@@ -53,8 +58,8 @@ void VulkanItem::mouseMoveEvent(QMouseEvent *event)
     if (isLineAdding) {
         auto itemSize = size();
 
-        float endXpos = ((localPos.x()) * 2 / itemSize.width() - 1) / VulkanRenderNode::z;
-        float endYpos = ((localPos.y()) * 2 / itemSize.height() - 1) / VulkanRenderNode::z;
+        float endXpos = ((localPos.x() - VulkanRenderNode::pos.x() / 2) * 2 / itemSize.width() - 1) / VulkanRenderNode::z;
+        float endYpos = ((localPos.y() - VulkanRenderNode::pos.y() / 2) * 2 / itemSize.height() - 1) / VulkanRenderNode::z;
         Geometry::Line line = {
             Geometry::Vertex{(float)addLineStart.x(), (float)addLineStart.y(), 0., 0., 0.}, 
             Geometry::Vertex{endXpos, endYpos, 0., 0., 0.}
@@ -92,8 +97,8 @@ void VulkanItem::mouseReleaseEvent(QMouseEvent *event)
         if (isSecondPoint) {
         auto itemSize = size();
 
-        float endXpos = ((event->position().x()) * 2 / itemSize.width() - 1) / VulkanRenderNode::z;
-        float endYpos = ((event->position().y()) * 2 / itemSize.height() - 1) / VulkanRenderNode::z;
+        float endXpos = ((event->position().x() - VulkanRenderNode::pos.x() / 2) * 2 / itemSize.width() - 1) / VulkanRenderNode::z;
+        float endYpos = ((event->position().y() - VulkanRenderNode::pos.y() / 2) * 2 / itemSize.height() - 1) / VulkanRenderNode::z;
 
         qDebug() << "endLineStart" << QPointF{endXpos, endXpos} << "eventposition" << event->position();
 
@@ -148,7 +153,11 @@ void VulkanItem::hoverLeaveEvent(QHoverEvent *event)
 void VulkanItem::wheelEvent(QWheelEvent* event)
 {
     float delta = event->angleDelta().ry();
-    VulkanRenderNode::z = delta > 0 ? VulkanRenderNode::z / 0.9 : VulkanRenderNode::z * 0.9;
+    if (delta > 0) {
+        VulkanRenderNode::z /= 0.9;
+    } else if (delta < 0 && VulkanRenderNode::z > 0.04) {
+        VulkanRenderNode::z *= 0.9;
+    }
     qDebug() << "VulkanItem::z" << VulkanRenderNode::z;
     event->accept();
 }

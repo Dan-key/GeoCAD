@@ -1011,7 +1011,7 @@ void VulkanRenderNode::drawTriangle(VkCommandBuffer commandBuffer)
     float time = QTime::currentTime().msecsSinceStartOfDay() % 10000;
     float angle = time;
     QMatrix4x4 model{};
-    // model.translate({(float)(pos.x()/window->size().width())/(z*20.f), (float)(pos.y()/window->size().height())/(z*20.f), 0});
+    // model.translate({(float)(pos.x()/itemSize.width())/(z*20.f), (float)(pos.y()/itemSize.height())/(z*20.f), 0});
     model.rotate(angle/2.0f, 0, 1, 0);
     QMatrix4x4 view{};
     view.translate({0.0f, 0.0f, -4.0f});
@@ -1065,7 +1065,7 @@ void VulkanRenderNode::drawTriangle(VkCommandBuffer commandBuffer)
 
 void VulkanRenderNode::drawNet(VkCommandBuffer commandBuffer)
 {
-    QQuickWindow *window = m_item->window();
+    auto itemSize = m_item->size();
 
     float time = QTime::currentTime().msecsSinceStartOfDay() % 10000;
     float angle = time;
@@ -1078,7 +1078,7 @@ void VulkanRenderNode::drawNet(VkCommandBuffer commandBuffer)
     // }
     localZ = z;
     mvp.scale(localZ);
-    mvp.translate((float)(pos.x()/window->size().width())/localZ, (float)(pos.y()/window->size().height())/localZ, 0);
+    mvp.translate((float)(pos.x()/itemSize.width())/localZ, (float)(pos.y()/itemSize.height())/localZ, 0);
     vkCmdPushConstants(
         commandBuffer,
         m_pipelineLineLayout,
@@ -1093,7 +1093,7 @@ void VulkanRenderNode::drawNet(VkCommandBuffer commandBuffer)
 
     // Set viewport and scissor
     QRectF rect = matrix()->mapRect(QRectF(0, 0, m_item->width(), m_item->height()));
-    qreal dpr = window->devicePixelRatio();
+    qreal dpr = m_item->window()->devicePixelRatio();
     rect.setWidth(dpr*rect.width());
     rect.setHeight(dpr*rect.height());
     _viewPort= rect;
@@ -1123,7 +1123,7 @@ void VulkanRenderNode::drawNet(VkCommandBuffer commandBuffer)
 
 void VulkanRenderNode::drawAddedLines(VkCommandBuffer commandBuffer)
 {
-    QQuickWindow *window = m_item->window();
+    auto itemSize = m_item->size();
 
     QMatrix4x4 mvp = {};
     static float localZ = 1;
@@ -1133,7 +1133,7 @@ void VulkanRenderNode::drawAddedLines(VkCommandBuffer commandBuffer)
     // }
     localZ = z;
     mvp.scale(localZ);
-    mvp.translate((float)(pos.x()/window->size().width())/localZ, (float)(pos.y()/window->size().height())/localZ, 0);
+    mvp.translate((float)(pos.x()/itemSize.width())/localZ, (float)(pos.y()/itemSize.height())/localZ, 0);
     vkCmdPushConstants(
         commandBuffer,
         m_pipelineLineLayout,
@@ -1148,7 +1148,7 @@ void VulkanRenderNode::drawAddedLines(VkCommandBuffer commandBuffer)
 
     // Set viewport and scissor
     QRectF rect = matrix()->mapRect(QRectF(0, 0, m_item->width(), m_item->height()));
-    qreal dpr = window->devicePixelRatio();
+    qreal dpr = m_item->window()->devicePixelRatio();
     rect.setWidth(dpr*rect.width());
     rect.setHeight(dpr*rect.height());
     _viewPort= rect;
@@ -1178,10 +1178,11 @@ void VulkanRenderNode::drawAddedLines(VkCommandBuffer commandBuffer)
 
 void VulkanRenderNode::drawLine(VkCommandBuffer commandBuffer)
 {
-    QQuickWindow *window = m_item->window();
+    auto itemSize = m_item->size();
+
 
     QMatrix4x4 i = {};
-    i.translate((float)(pos.x()/window->size().width()), (float)(pos.y()/window->size().height()), 0);
+    i.translate((float)(pos.x()/itemSize.width()), (float)(pos.y()/itemSize.height()), 0);
 
     vkCmdPushConstants(
         commandBuffer,
@@ -1194,7 +1195,7 @@ void VulkanRenderNode::drawLine(VkCommandBuffer commandBuffer)
 
     m_devFuncs->vkCmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, m_graphicsLinePipeline);
     QRectF rect = matrix()->mapRect(QRectF(0, 0, m_item->width(), m_item->height()));
-    qreal dpr = window->devicePixelRatio();
+    qreal dpr = m_item->window()->devicePixelRatio();
     rect.setWidth(dpr*rect.width());
     rect.setHeight(dpr*rect.height());
 
