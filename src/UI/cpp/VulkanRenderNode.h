@@ -7,6 +7,7 @@
 #include <QVulkanDeviceFunctions>
 
 #include "Geometry/Line.h"
+#include "Library/Files/SpirvByteCode.h"
 
 class VulkanRenderNode : public QSGRenderNode
 {
@@ -34,8 +35,11 @@ private:
     void createAddedLinesVertexBuffer();
 
     void createShaderModules();
+
     void createTrianglePipeline(VkRenderPass renderPass);
     void createLinePipeline(VkRenderPass renderPass);
+    void createCirclePipeline(VkRenderPass renderPass);
+
     void recordCommandBuffer(const RenderState *state);
     void updateVertexBuffer();
     void updateVertexAddedLinesBuffer();
@@ -70,16 +74,22 @@ private:
     VkShaderModule m_vertShaderModule = VK_NULL_HANDLE;
     VkShaderModule m_fragShaderModule = VK_NULL_HANDLE;
     VkShaderModule m_fragDashShaderModule = VK_NULL_HANDLE;
-    
+    VkShaderModule m_vertCircleModule = VK_NULL_HANDLE;
+    VkShaderModule m_fragCircleModule = VK_NULL_HANDLE;
+
     VkPipelineLayout m_pipelineTriangleLayout = VK_NULL_HANDLE;
     VkPipeline m_graphicsTrianglePipeline = VK_NULL_HANDLE;
 
     VkPipelineLayout m_pipelineLineLayout = VK_NULL_HANDLE;
     VkPipeline m_graphicsLinePipeline = VK_NULL_HANDLE;
 
+    VkPipelineLayout m_pipelineCircleLayout = VK_NULL_HANDLE;
+    VkPipeline m_graphicsCirclePipeline = VK_NULL_HANDLE;
+
     bool m_initialized = false;
     bool m_trianglePipelineCreated = false;
     bool m_linePipelineCreated = false;
+    bool m_circlePipelineCreated = false;
 
     // Store vertices for dynamic updates
     std::vector<Geometry::Vertex> m_verticesTriangle;
@@ -92,4 +102,9 @@ private:
     bool m_verticesDirty = false;
     bool m_verticesAddedLinesDirty = true;
 
+    Files::SpirvByteCode vertShaderCode;
+    Files::SpirvByteCode fragShaderCode;
+    Files::SpirvByteCode fragDashShaderCode;
+    Files::SpirvByteCode fragCircleShaderCode;
+    Files::SpirvByteCode vertCircleShaderCode;
 };

@@ -19,8 +19,10 @@ ApplicationWindow {
         Rectangle {
             visible:true
             Layout.fillWidth: true
-            height: 50
-            color: "#2c3e50"
+            height: 60
+            color: "#2c5037"
+            border.color: "#16291c"
+            border.width: 2
             RowLayout {
                 anchors.fill: parent
                 GeoButton {
@@ -55,8 +57,9 @@ ApplicationWindow {
                 anchors.fill: parent
                 color: '#9db0c4'
                 border.color: "white"
-                border.width: 2
+                anchors.margins: 0
             }
+            anchors.margins: 0
             // Component.onCompleted: {
             //     vulkanItem.addingLine.connect(mainWindow.lineSignal);
             // } 

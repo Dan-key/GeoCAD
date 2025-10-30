@@ -1,3 +1,4 @@
+#include <stdexcept>
 #include <vulkan/vulkan.h>
 
 #include <QSGRendererInterface>
@@ -5,23 +6,9 @@
 #include <QQuickWindow>
 
 #include "VulkanRenderNode.h"
+#include "Library/Files/FileStream.h"
 
 namespace {
-
-uint32_t* read_spv(const char* path, size_t* out_size_bytes) {
-    FILE* f = fopen(path, "rb");
-    if (!f) return NULL;
-    fseek(f, 0, SEEK_END);
-    long sz = ftell(f);
-    fseek(f, 0, SEEK_SET);
-    if (sz <= 0) { fclose(f); return NULL; }
-    uint32_t* data = (uint32_t*)malloc(sz);
-    if (!data) { fclose(f); return NULL; }
-    if (fread(data, 1, sz, f) != (size_t)sz) { free(data); fclose(f); return NULL; }
-    fclose(f);
-    *out_size_bytes = (size_t)sz;
-    return data;
-}
 
 std::string queueFamiliesFlagsToString(VkQueueFlags flags)
 {
@@ -46,28 +33,20 @@ std::string queueFamiliesFlagsToString(VkQueueFlags flags)
 float VulkanRenderNode::z = 1.0f;
 QPointF VulkanRenderNode::pos = {0, 0};
 
-static uint32_t* vertShaderCode;
-static size_t vertShaderSize;
-
-static uint32_t* fragShaderCode;
-static size_t fragShaderSize;
-
-static uint32_t* fragDashShaderCode;
-static size_t fragDashShaderSize;
-
 VulkanRenderNode::VulkanRenderNode(QQuickItem *item)
     : m_item(item)
 {
-    size_t size = 0;
-    vertShaderCode = read_spv("shaders/vertex.spv", &size);
-    vertShaderSize = size;
-    std::cout << "Vertex shader size: " << vertShaderSize << " bytes\n";
-    fragShaderCode = read_spv("shaders/frag.spv", &size);
-    fragShaderSize = size;
-    std::cout << "Fragment shader size: " << fragShaderSize << " bytes\n";
-    fragDashShaderCode = read_spv("shaders/frag_dash_line.spv", &size);
-    fragDashShaderSize = size;
-    std::cout << "Fragment dash shader size: " << fragShaderSize << " bytes\n";
+    Files::FileStream vertFS("shaders/vertex.spv");
+    Files::FileStream fragFS("shaders/frag.spv");
+    Files::FileStream fragDashFS("shaders/frag_dash_line.spv");
+    Files::FileStream vertCircleFS("shaders/vertex_circle.spv");
+    Files::FileStream fragCircleFS("shaders/frag_circle.spv");
+
+    vertShaderCode = vertFS.getSpirvByteCode();
+    fragShaderCode = fragFS.getSpirvByteCode();
+    fragDashShaderCode = fragDashFS.getSpirvByteCode();
+    vertCircleShaderCode = vertCircleFS.getSpirvByteCode();
+    fragCircleShaderCode = fragCircleFS.getSpirvByteCode();
 }
 
 VulkanRenderNode::~VulkanRenderNode()
@@ -188,9 +167,12 @@ void VulkanRenderNode::initVulkan()
         qWarning("Failed to create net vertex buffer!");
         return;
     }
- 
+
     createShaderModules();
-    if (m_vertShaderModule == VK_NULL_HANDLE || m_fragShaderModule == VK_NULL_HANDLE) {
+    if (m_vertShaderModule == VK_NULL_HANDLE ||
+        m_fragShaderModule == VK_NULL_HANDLE ||
+        m_fragCircleModule == VK_NULL_HANDLE ||
+        m_fragCircleModule == VK_NULL_HANDLE) {
         qWarning("Failed to create shader modules!");
         return;
     }
@@ -310,7 +292,7 @@ void VulkanRenderNode::createAddedLinesVertexBuffer()
 
     VkBufferCreateInfo bufferInfo = {};
     bufferInfo.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
-    bufferInfo.size = 200 * sizeof(decltype(m_verticesAddedLines)::value_type);
+    bufferInfo.size = 1000 * sizeof(decltype(m_verticesAddedLines)::value_type);
     bufferInfo.usage = VK_BUFFER_USAGE_VERTEX_BUFFER_BIT;
     bufferInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
 
@@ -388,10 +370,10 @@ void VulkanRenderNode::createShaderModules()
     createInfo.sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO;
 
     // Vertex shader
-    createInfo.codeSize = vertShaderSize;
-    createInfo.pCode = vertShaderCode;
+    createInfo.codeSize = vertShaderCode.size();
+    createInfo.pCode = vertShaderCode.data();
 
-    qDebug("Creating vertex shader module, size: %zu bytes", vertShaderSize);
+    qDebug("Creating vertex shader module, size: %zu bytes", vertShaderCode.size());
     VkResult result = m_devFuncs->vkCreateShaderModule(m_device, &createInfo, nullptr, &m_vertShaderModule);
     if (result != VK_SUCCESS) {
         qWarning("Failed to create vertex shader module: %d", result);
@@ -400,10 +382,10 @@ void VulkanRenderNode::createShaderModules()
     qDebug("Vertex shader module created: %p", m_vertShaderModule);
 
     // Fragment shader
-    createInfo.codeSize = fragShaderSize;
-    createInfo.pCode = fragShaderCode;
+    createInfo.codeSize = fragShaderCode.size();
+    createInfo.pCode = fragShaderCode.data();
 
-    qDebug("Creating fragment shader module, size: %zu bytes", fragShaderSize);
+    qDebug("Creating fragment shader module, size: %zu bytes", fragShaderCode.size());
     result = m_devFuncs->vkCreateShaderModule(m_device, &createInfo, nullptr, &m_fragShaderModule);
     if (result != VK_SUCCESS) {
         qWarning("Failed to create fragment shader module: %d", result);
@@ -411,16 +393,39 @@ void VulkanRenderNode::createShaderModules()
     }
     qDebug("Fragment shader module created: %p", m_fragShaderModule);
 
-    createInfo.codeSize = fragDashShaderSize;
-    createInfo.pCode = fragDashShaderCode;
+    createInfo.codeSize = fragDashShaderCode.size();
+    createInfo.pCode = fragDashShaderCode.data();
 
-    qDebug("Creating fragment dash shader module, size: %zu bytes", fragDashShaderSize);
+    qDebug("Creating fragment dash shader module, size: %zu bytes", fragDashShaderCode.size());
     result = m_devFuncs->vkCreateShaderModule(m_device, &createInfo, nullptr, &m_fragDashShaderModule);
     if (result != VK_SUCCESS) {
         qWarning("Failed to create fragment dashshader module: %d", result);
         return;
     }
-    qDebug("Fragment dash shader module created: %p", m_fragDashShaderModule);
+
+    createInfo.codeSize = vertCircleShaderCode.size();
+    createInfo.pCode = vertCircleShaderCode.data();
+
+    qDebug("Creating vertex circle shader module, size: %zu bytes", vertCircleShaderCode.size());
+
+    result = m_devFuncs->vkCreateShaderModule(m_device, &createInfo, nullptr, &m_vertCircleModule);
+    if (result != VK_SUCCESS) {
+        qWarning("Failed to create fragment cicle module: %d", result);
+        return;
+    }
+    qDebug("Vertex circle shader module created: %p", m_vertCircleModule);
+
+    createInfo.codeSize = fragCircleShaderCode.size();
+    createInfo.pCode = fragCircleShaderCode.data();
+
+    qDebug("Creating fragment circle shader module, size: %zu bytes", fragCircleShaderCode.size());
+
+    result = m_devFuncs->vkCreateShaderModule(m_device, &createInfo, nullptr, &m_fragCircleModule);
+    if (result != VK_SUCCESS) {
+        qWarning("Failed to create fragment cicle module: %d", result);
+        return;
+    }
+    qDebug("Fragment circle shader module created: %p", m_fragCircleModule);
 }
 
 void VulkanRenderNode::createTrianglePipeline(VkRenderPass renderPass)
@@ -892,6 +897,245 @@ void VulkanRenderNode::createLinePipeline(VkRenderPass renderPass)
     qDebug("Graphics line pipeline created successfully!");
 }
 
+void VulkanRenderNode::createCirclePipeline(VkRenderPass renderPass)
+{
+    // Verify we have a valid render pass
+    if (renderPass == VK_NULL_HANDLE) {
+        qWarning("Cannot create pipeline: invalid render pass");
+        return;
+    }
+
+    // Don't recreate if already created
+    // if (m_linePipelineCreated && m_graphicsLinePipeline != VK_NULL_HANDLE) {
+    //     return;
+    // }
+
+    qDebug("Creating graphics pipeline with render pass %p", renderPass);
+
+    // Verify all prerequisites
+    if (!m_devFuncs) {
+        qWarning("No device functions!");
+        return;
+    }
+
+    if (m_device == VK_NULL_HANDLE) {
+        qWarning("No device!");
+        return;
+    }
+
+    // if (m_vertShaderModule == VK_NULL_HANDLE || m_fragShaderModule == VK_NULL_HANDLE) {
+    //     qWarning("Shader modules not created!");
+    //     return;
+    // }
+
+    VkResult result;
+
+    // Shader stages
+    VkPipelineShaderStageCreateInfo shaderStages[2] = {};
+
+    shaderStages[0].sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
+    shaderStages[0].stage = VK_SHADER_STAGE_VERTEX_BIT;
+    shaderStages[0].module = m_vertCircleModule;
+    shaderStages[0].pName = "main";
+    shaderStages[0].pSpecializationInfo = nullptr;
+
+    shaderStages[1].sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
+    shaderStages[1].stage = VK_SHADER_STAGE_FRAGMENT_BIT;
+    shaderStages[1].module = m_fragCircleModule;
+    shaderStages[1].pName = "main";
+    shaderStages[1].pSpecializationInfo = nullptr;
+
+    // Vertex input
+    VkVertexInputBindingDescription bindingDescription = {};
+    bindingDescription.binding = 0;
+    bindingDescription.stride = sizeof(Geometry::Vertex);
+    bindingDescription.inputRate = VK_VERTEX_INPUT_RATE_VERTEX;
+
+    VkVertexInputAttributeDescription attributeDescriptions[2] = {};
+    attributeDescriptions[0].binding = 0;
+    attributeDescriptions[0].location = 0;
+    attributeDescriptions[0].format = VK_FORMAT_R32G32_SFLOAT;
+    attributeDescriptions[0].offset = offsetof(Geometry::Vertex, pos);
+
+    attributeDescriptions[1].binding = 0;
+    attributeDescriptions[1].location = 1;
+    attributeDescriptions[1].format = VK_FORMAT_R32G32B32_SFLOAT;
+    attributeDescriptions[1].offset = offsetof(Geometry::Vertex, color);
+
+    VkPipelineVertexInputStateCreateInfo vertexInputInfo = {};
+    vertexInputInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO;
+    vertexInputInfo.pNext = nullptr;
+    vertexInputInfo.flags = 0;
+    vertexInputInfo.vertexBindingDescriptionCount = 1;
+    vertexInputInfo.pVertexBindingDescriptions = &bindingDescription;
+    vertexInputInfo.vertexAttributeDescriptionCount = 2;
+    vertexInputInfo.pVertexAttributeDescriptions = attributeDescriptions;
+
+    // Input assembly
+    VkPipelineInputAssemblyStateCreateInfo inputAssembly = {};
+    inputAssembly.sType = VK_STRUCTURE_TYPE_PIPELINE_INPUT_ASSEMBLY_STATE_CREATE_INFO;
+    inputAssembly.pNext = nullptr;
+    inputAssembly.flags = 0;
+    inputAssembly.topology = VK_PRIMITIVE_TOPOLOGY_LINE_LIST;
+    inputAssembly.primitiveRestartEnable = VK_FALSE;
+
+    // Viewport and scissor (dynamic)
+    VkPipelineViewportStateCreateInfo viewportState = {};
+    viewportState.sType = VK_STRUCTURE_TYPE_PIPELINE_VIEWPORT_STATE_CREATE_INFO;
+    viewportState.pNext = nullptr;
+    viewportState.flags = 0;
+    viewportState.viewportCount = 1;
+    viewportState.pViewports = nullptr; // Dynamic
+    viewportState.scissorCount = 1;
+    viewportState.pScissors = nullptr; // Dynamic
+
+    // Rasterizer
+    VkPipelineRasterizationStateCreateInfo rasterizer = {};
+    rasterizer.sType = VK_STRUCTURE_TYPE_PIPELINE_RASTERIZATION_STATE_CREATE_INFO;
+    rasterizer.pNext = nullptr;
+    rasterizer.flags = 0;
+    rasterizer.depthClampEnable = VK_FALSE;
+    rasterizer.rasterizerDiscardEnable = VK_FALSE;
+    rasterizer.polygonMode = VK_POLYGON_MODE_FILL;
+    rasterizer.lineWidth = 1.0f;
+    rasterizer.cullMode = VK_CULL_MODE_NONE;
+    rasterizer.frontFace = VK_FRONT_FACE_COUNTER_CLOCKWISE;
+    rasterizer.depthBiasEnable = VK_FALSE;
+    rasterizer.depthBiasConstantFactor = 0.0f;
+    rasterizer.depthBiasClamp = 0.0f;
+    rasterizer.depthBiasSlopeFactor = 0.0f;
+
+    // Multisampling
+    VkPipelineMultisampleStateCreateInfo multisampling = {};
+    multisampling.sType = VK_STRUCTURE_TYPE_PIPELINE_MULTISAMPLE_STATE_CREATE_INFO;
+    multisampling.pNext = nullptr;
+    multisampling.flags = 0;
+    multisampling.sampleShadingEnable = VK_FALSE;
+    multisampling.rasterizationSamples = VK_SAMPLE_COUNT_1_BIT;
+    multisampling.minSampleShading = 1.0f;
+    multisampling.pSampleMask = nullptr;
+    multisampling.alphaToCoverageEnable = VK_FALSE;
+    multisampling.alphaToOneEnable = VK_FALSE;
+
+    // Depth stencil
+    VkPipelineDepthStencilStateCreateInfo depthStencil = {};
+    depthStencil.sType = VK_STRUCTURE_TYPE_PIPELINE_DEPTH_STENCIL_STATE_CREATE_INFO;
+    depthStencil.pNext = nullptr;
+    depthStencil.flags = 0;
+    depthStencil.depthTestEnable = VK_FALSE;
+    depthStencil.depthWriteEnable = VK_FALSE;
+    depthStencil.depthCompareOp = VK_COMPARE_OP_ALWAYS;
+    depthStencil.depthBoundsTestEnable = VK_FALSE;
+    depthStencil.stencilTestEnable = VK_FALSE;
+    depthStencil.minDepthBounds = 0.0f;
+    depthStencil.maxDepthBounds = 1.0f;
+
+    // Color blending
+    VkPipelineColorBlendAttachmentState colorBlendAttachment = {};
+    colorBlendAttachment.colorWriteMask = VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT | 
+                                          VK_COLOR_COMPONENT_B_BIT | VK_COLOR_COMPONENT_A_BIT;
+    colorBlendAttachment.blendEnable = VK_TRUE;
+    colorBlendAttachment.srcColorBlendFactor = VK_BLEND_FACTOR_SRC_ALPHA;
+    colorBlendAttachment.dstColorBlendFactor = VK_BLEND_FACTOR_ONE_MINUS_SRC_ALPHA;
+    colorBlendAttachment.colorBlendOp = VK_BLEND_OP_ADD;
+    colorBlendAttachment.srcAlphaBlendFactor = VK_BLEND_FACTOR_ONE;
+    colorBlendAttachment.dstAlphaBlendFactor = VK_BLEND_FACTOR_ZERO;
+    colorBlendAttachment.alphaBlendOp = VK_BLEND_OP_ADD;
+
+    VkPipelineColorBlendStateCreateInfo colorBlending = {};
+    colorBlending.sType = VK_STRUCTURE_TYPE_PIPELINE_COLOR_BLEND_STATE_CREATE_INFO;
+    colorBlending.pNext = nullptr;
+    colorBlending.flags = 0;
+    colorBlending.logicOpEnable = VK_FALSE;
+    colorBlending.logicOp = VK_LOGIC_OP_COPY;
+    colorBlending.attachmentCount = 1;
+    colorBlending.pAttachments = &colorBlendAttachment;
+    colorBlending.blendConstants[0] = 0.0f;
+    colorBlending.blendConstants[1] = 0.0f;
+    colorBlending.blendConstants[2] = 0.0f;
+    colorBlending.blendConstants[3] = 0.0f;
+
+    // Dynamic state
+    VkDynamicState dynamicStates[] = {
+        VK_DYNAMIC_STATE_VIEWPORT, 
+        VK_DYNAMIC_STATE_SCISSOR,
+        VK_DYNAMIC_STATE_LINE_WIDTH
+    };
+
+    VkPipelineDynamicStateCreateInfo dynamicState = {};
+    dynamicState.sType = VK_STRUCTURE_TYPE_PIPELINE_DYNAMIC_STATE_CREATE_INFO;
+    dynamicState.pNext = nullptr;
+    dynamicState.flags = 0;
+    dynamicState.dynamicStateCount = 3;
+    dynamicState.pDynamicStates = dynamicStates;
+
+    // Pipeline layout (create if not exists)
+    if (m_pipelineLineLayout == VK_NULL_HANDLE) {
+        VkPushConstantRange pushConstantRanges[2];
+        pushConstantRanges[0].stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
+        pushConstantRanges[0].offset = 0;
+        pushConstantRanges[0].size = sizeof(float) * 2;
+
+        pushConstantRanges[1].stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
+        pushConstantRanges[1].offset = sizeof(float) * 2;
+        pushConstantRanges[1].size = sizeof(float);
+
+
+        VkPipelineLayoutCreateInfo pipelineLayoutInfo = {};
+        pipelineLayoutInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
+        pipelineLayoutInfo.pushConstantRangeCount = 2;
+        pipelineLayoutInfo.pPushConstantRanges = pushConstantRanges;
+        pipelineLayoutInfo.setLayoutCount = 0;
+        pipelineLayoutInfo.pSetLayouts = nullptr;
+
+        result = m_devFuncs->vkCreatePipelineLayout(m_device, &pipelineLayoutInfo, nullptr, &m_pipelineCircleLayout);
+        if (result != VK_SUCCESS) {
+            qWarning("Failed to create pipeline layout: %d", result);
+            return;
+        }
+        qDebug("Pipeline layout created: %p", m_pipelineTriangleLayout);
+    }
+
+    // Create pipeline
+    VkGraphicsPipelineCreateInfo pipelineInfo = {};
+    pipelineInfo.sType = VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO;
+    pipelineInfo.pNext = nullptr;
+    pipelineInfo.flags = 0;
+    pipelineInfo.stageCount = 2;
+    pipelineInfo.pStages = shaderStages;
+    pipelineInfo.pVertexInputState = nullptr;
+    pipelineInfo.pInputAssemblyState = &inputAssembly;
+    pipelineInfo.pTessellationState = nullptr;
+    pipelineInfo.pViewportState = &viewportState;
+    pipelineInfo.pRasterizationState = &rasterizer;
+    pipelineInfo.pMultisampleState = &multisampling;
+    pipelineInfo.pDepthStencilState = &depthStencil;
+    pipelineInfo.pColorBlendState = &colorBlending;
+    pipelineInfo.pDynamicState = &dynamicState;
+    pipelineInfo.layout = m_pipelineLineLayout;
+    pipelineInfo.renderPass = renderPass;
+    pipelineInfo.subpass = 0;
+    pipelineInfo.basePipelineHandle = VK_NULL_HANDLE;
+    pipelineInfo.basePipelineIndex = -1;
+
+    qDebug("Calling vkCreateGraphicsPipelines...");
+    qDebug("  Device: %p", m_device);
+    qDebug("  Pipeline layout: %p", m_pipelineCircleLayout);
+    qDebug("  Render pass: %p", renderPass);
+    qDebug("  Vert shader: %p", m_vertCircleModule);
+    qDebug("  Frag shader: %p", m_fragCircleModule);
+
+    result = m_devFuncs->vkCreateGraphicsPipelines(m_device, VK_NULL_HANDLE, 1, &pipelineInfo, nullptr, &m_graphicsCirclePipeline);
+    if (result != VK_SUCCESS) {
+        qWarning("Failed to create graphics pipeline: %d", result);
+        m_graphicsCirclePipeline = VK_NULL_HANDLE;
+        return;
+    }
+
+    m_circlePipelineCreated = true;
+    qDebug("Graphics line pipeline created successfully!");
+}
+
 void VulkanRenderNode::updateVertexBuffer()
 {
     if (!m_verticesDirty || m_vertexTriangleBuffer == VK_NULL_HANDLE)
@@ -925,7 +1169,7 @@ void VulkanRenderNode::updateVertexAddedLinesBuffer()
 
 void VulkanRenderNode::updateVertexPosition(const QPointF& position)
 {
-    qDebug() << "Updating vertex position to:" << position;
+    // qDebug() << "Updating vertex position to:" << position;
     if (m_verticesTriangle.size() >= 1) {
 
         double x = (position.x() / m_item->width()) * 2.0 - 1.0;
@@ -935,7 +1179,7 @@ void VulkanRenderNode::updateVertexPosition(const QPointF& position)
         m_verticesTriangle[0].pos[1] = static_cast<float>(y);
         
         m_verticesDirty = true;
-        qDebug() << "Vertex updated to:" << m_verticesTriangle[0].pos[0] << m_verticesTriangle[0].pos[1];
+        // qDebug() << "Vertex updated to:" << m_verticesTriangle[0].pos[0] << m_verticesTriangle[0].pos[1];
     }
     updateVertexBuffer();
 }
@@ -970,6 +1214,10 @@ void VulkanRenderNode::render(const RenderState *state)
     if (!m_trianglePipelineCreated) {
         createTrianglePipeline(currentRenderPass);
         createLinePipeline(currentRenderPass);
+    }
+
+    if (m_circlePipelineCreated) {
+        createCirclePipeline(currentRenderPass);
     }
 
     if (m_graphicsTrianglePipeline == VK_NULL_HANDLE)
@@ -1265,6 +1513,14 @@ void VulkanRenderNode::releaseResources()
     if (m_fragDashShaderModule != VK_NULL_HANDLE) {
         m_devFuncs->vkDestroyShaderModule(m_device, m_fragDashShaderModule, nullptr);
         m_fragDashShaderModule = VK_NULL_HANDLE;
+    }
+
+    if (m_vertCircleModule != VK_NULL_HANDLE) {
+        m_devFuncs->vkDestroyShaderModule(m_device, m_vertCircleModule, nullptr);
+    }
+
+    if (m_fragCircleModule != VK_NULL_HANDLE) {
+        m_devFuncs->vkDestroyShaderModule(m_device, m_fragCircleModule, nullptr);
     }
 
     if (m_vertexTriangleBuffer != VK_NULL_HANDLE) {

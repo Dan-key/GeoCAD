@@ -6,6 +6,7 @@
 #include "UI/cpp/MainWindow.h"
 #include "UI/cpp/VulkanItem.h"
 #include <QQuickWindow>
+#include "Library/Files/FileStream.h"
 
 int main(int argc, char *argv[])
 {

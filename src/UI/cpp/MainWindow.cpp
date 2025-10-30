@@ -11,5 +11,5 @@ void MainWindow::addLine()
     if (!QGuiApplication::overrideCursor() || QGuiApplication::overrideCursor()->shape() != Qt::CrossCursor) {
         QGuiApplication::setOverrideCursor(QCursor(Qt::CrossCursor));
         emit lineSignal();
-    } 
+    }
 }

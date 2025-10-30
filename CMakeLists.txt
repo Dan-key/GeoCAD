@@ -55,6 +55,8 @@ add_custom_target(spirv_shaders ALL DEPENDS ${SPV_OUT_FILES})
 
 add_dependencies(${PROJECT_NAME} spirv_shaders)
 
+include_directories("src")
+
 target_link_libraries(${PROJECT_NAME} Qt6::Core Qt6::Qml Qt6::Quick Vulkan::Vulkan)
 target_include_directories(${PROJECT_NAME} PRIVATE
     ${Vulkan_INCLUDE_DIRS}
