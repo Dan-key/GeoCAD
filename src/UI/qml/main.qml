@@ -2,7 +2,7 @@ import QtQuick 2.15
 import QtQuick.Controls 2.15
 import QtQuick.Layouts 2.15
 
-
+import "Library"
 import VulkanApp 1.0
 
 ApplicationWindow {
@@ -21,25 +21,27 @@ ApplicationWindow {
             Layout.fillWidth: true
             height: 50
             color: "#2c3e50"
-            Button {
-                text: "addLine"
-                onClicked: {
-                    mainWindow.addLine();
-                    vulkanItem.addingLine();
+            RowLayout {
+                anchors.fill: parent
+                GeoButton {
+                    text: "addLine"
+                    onClicked: {
+                        mainWindow.addLine();
+                        vulkanItem.addingLine();
+                    }
                 }
-                width: 70
-                height: 30
-                contentItem: Rectangle{
-                    id: rect
-                    anchors.fill: parent
-                    border.width: 2
-                    border.color: '#1a7a02'
-                    color: '#2dcb05'
-                    Text{
-                        anchors.centerIn: parent
-                        font.pixelSize: 10
-                        color: "white" 
-                        text : parent.parent.text
+                GeoButton {
+                    text: "addLine"
+                    onClicked: {
+                        mainWindow.addLine();
+                        vulkanItem.addingLine();
+                    }
+                }
+                GeoButton {
+                    text: "addLine"
+                    onClicked: {
+                        mainWindow.addLine();
+                        vulkanItem.addingLine();
                     }
                 }
             }
