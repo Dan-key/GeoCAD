@@ -913,10 +913,11 @@ void VulkanRenderNode::updateVertexAddedLinesBuffer()
         return;
 
     void* data;
-    VkResult result = m_devFuncs->vkMapMemory(m_device, m_vertexAddedLinesBufferMemory, 0, 
+
+    VkResult result = m_devFuncs->vkMapMemory(m_device, m_vertexAddedLinesBufferMemory, (m_verticesAddedLines.size() - 1)*sizeof(m_verticesAddedLines[0]), 
                                              sizeof(Geometry::Line) * m_verticesAddedLines.size(), 0, &data);
     if (result == VK_SUCCESS) {
-        memcpy(data, m_verticesAddedLines.data(), sizeof(Geometry::Line) * m_verticesAddedLines.size());
+        memcpy(data, &m_verticesAddedLines[m_verticesAddedLines.size() -1], sizeof(Geometry::Line));
         m_devFuncs->vkUnmapMemory(m_device, m_vertexAddedLinesBufferMemory);
         m_verticesAddedLinesDirty = false;
     }
