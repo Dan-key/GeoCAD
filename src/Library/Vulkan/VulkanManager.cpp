@@ -1,3 +1,4 @@
+#include <qcontainerfwd.h>
 #include <vulkan/vulkan.h>
 #include "VulkanManager.h"
 #include <QQuickWindow>
@@ -38,7 +39,7 @@ VulkanManager::VulkanManager(QQuickItem* item) :
 
 VkShaderModule VulkanManager::createShaderModule(const SpirvByteCode& spirv) const
 {
-    VkShaderModule shader;    
+    VkShaderModule shader;
 
     VkShaderModuleCreateInfo createInfo;
     createInfo.sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO;
@@ -64,5 +65,23 @@ void VulkanManager::printDebug() const
     vkGetPhysicalDeviceFeatures(_physicalDevice, &features);
     qDebug("wideline supported: %d", features.wideLines);
 }
+
+VkBuffer VulkanManager::createBuffer(size_t size) const
+{
+    VkBuffer buffer;
+    VkBufferCreateInfo bufferInfo = {};
+    bufferInfo.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
+    bufferInfo.size = size;
+    bufferInfo.usage = VK_BUFFER_USAGE_VERTEX_BUFFER_BIT;
+    bufferInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
+
+    VkResult result = _devFuncs->vkCreateBuffer(_device, &bufferInfo, nullptr, &buffer);
+    if (result != VK_SUCCESS) {
+        throw std::runtime_error(QString("can't create buffer result: %1").arg(result).toStdString());
+    }
+
+    return buffer;
+}
+
 
 } // namespace Vulkan

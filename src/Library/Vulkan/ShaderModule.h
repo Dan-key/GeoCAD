@@ -5,11 +5,12 @@
 #include <vulkan/vulkan.h>
 #include <string>
 #include "Library/Vulkan/SpirvByteCode.h"
+#include "Library/Vulkan/VulkanComponent.h"
 #include "Library/Vulkan/VulkanManager.h"
 
 namespace Vulkan {
 
-class ShaderModule {
+class ShaderModule : protected VulkanComponent {
 public:
     ShaderModule(std::shared_ptr<VulkanManager>& vkManager, const std::string& fileName);
     ShaderModule(std::shared_ptr<VulkanManager>& vkManager, const SpirvByteCode&);
@@ -19,7 +20,6 @@ public:
 
 protected:
     VkShaderModule _module;
-    std::shared_ptr<VulkanManager> _vkManager;
 };
 
 }

@@ -3,6 +3,7 @@
 #include <QQuickItem>
 #include <QVulkanInstance>
 #include <QSGRendererInterface>
+#include <cstddef>
 #include "SpirvByteCode.h"
 
 namespace Vulkan {
@@ -12,6 +13,8 @@ public:
     VulkanManager(QQuickItem* item);
 
     VkShaderModule createShaderModule(const SpirvByteCode&) const;
+    VkBuffer createBuffer(size_t size) const;
+
     void printDebug() const;
 
 protected:
