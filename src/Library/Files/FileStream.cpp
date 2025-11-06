@@ -67,9 +67,9 @@ std::vector<uint32_t> FileStream::readBinary() const
     return v;
 }
 
-SpirvByteCode FileStream::getSpirvByteCode() const
+Vulkan::SpirvByteCode FileStream::getSpirvByteCode() const
 {
-    return SpirvByteCode(readBinary());
+    return Vulkan::SpirvByteCode(readBinary());
 }
 
 size_t FileStream::getSize() const

@@ -1,11 +1,12 @@
 #pragma once
 
-#include "SpirvByteCode.h"
 #include <cstddef>
 #include <filesystem>
 #include <optional>
 #include <string>
 #include <vector>
+
+#include "Library/Vulkan/SpirvByteCode.h"
 
 namespace Files {
 
@@ -18,7 +19,7 @@ public:
     ~FileStream();
 
     size_t getSize() const;
-    SpirvByteCode getSpirvByteCode() const;
+    Vulkan::SpirvByteCode getSpirvByteCode() const;
 
 protected:
     std::vector<uint32_t> readBinary() const;

@@ -3,7 +3,7 @@
 #include <vector>
 #include <cstdint>
 
-namespace Files {
+namespace Vulkan {
 
 class SpirvByteCode {
 public:
@@ -19,6 +19,7 @@ public:
 
     size_t size() const noexcept;
     uint32_t* data() noexcept;
+    const uint32_t* data() const noexcept;
 
 private:
     std::vector<uint32_t> _byteCode;

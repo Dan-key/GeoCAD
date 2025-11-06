@@ -1,3 +1,7 @@
+#include <exception>
+#include <memory>
+#include <qlogging.h>
+#include <qquickitem.h>
 #include <stdexcept>
 #include <vulkan/vulkan.h>
 
@@ -7,6 +11,7 @@
 
 #include "VulkanRenderNode.h"
 #include "Library/Files/FileStream.h"
+#include "Library/Vulkan/VulkanManager.h"
 
 namespace {
 
@@ -34,7 +39,6 @@ float VulkanRenderNode::z = 1.0f;
 QPointF VulkanRenderNode::pos = {0, 0};
 
 VulkanRenderNode::VulkanRenderNode(QQuickItem *item)
-    : m_item(item)
 {
     Files::FileStream vertFS("shaders/vertex.spv");
     Files::FileStream fragFS("shaders/frag.spv");
@@ -84,59 +88,18 @@ uint32_t findGraphicsQueueFamily(VkPhysicalDevice physicalDevice)
     return res;
 }
 
-void VulkanRenderNode::initVulkan()
+void VulkanRenderNode::initVulkan(QQuickItem* item)
 {
     if (m_initialized)
         return;
 
-    QQuickWindow *window = m_item->window();
-    if (!window) {
-        qWarning("No window available!");
-        return;
+    try {
+        _vkManager = std::make_shared<Vulkan::VulkanManager>(item);
+    } catch (const std::exception& excp) {
+        qWarning() << excp.what();
     }
 
-    QSGRendererInterface *rif = window->rendererInterface();
-    if (!rif) {
-        qWarning("No renderer interface!");
-        return;
-    }
- 
-    if (rif->graphicsApi() != QSGRendererInterface::VulkanRhi) {
-        qWarning("Not using Vulkan RHI!");
-        return;
-    }
-
-    m_vulkanInstance = window->vulkanInstance();
-    if (!m_vulkanInstance) {
-        qWarning("No Vulkan instance!");
-        return;
-    }
-
-    m_device = *static_cast<VkDevice *>(rif->getResource(window, QSGRendererInterface::DeviceResource));
-    m_physicalDevice = *static_cast<VkPhysicalDevice *>(rif->getResource(window, QSGRendererInterface::PhysicalDeviceResource));
-    
-    if (m_device == VK_NULL_HANDLE || m_physicalDevice == VK_NULL_HANDLE) {
-        qWarning("Invalid Vulkan device or physical device!");
-        return;
-    }
-
-    m_devFuncs = m_vulkanInstance->deviceFunctions(m_device);
-    if (!m_devFuncs) {
-        qWarning("Failed to get device functions!");
-        return;
-    }
-
-    qDebug("Device functions pointer: %p", m_devFuncs);
-    qDebug("Testing a simple Vulkan call...");
-
-    // Test that device functions work with a simple call
-    VkPhysicalDeviceProperties props;
-    vkGetPhysicalDeviceProperties(m_physicalDevice, &props);
-    qDebug("GPU: %s", props.deviceName);
-
-    VkPhysicalDeviceFeatures features;
-    vkGetPhysicalDeviceFeatures(m_physicalDevice, &features);
-    qDebug("wideline supported: %d", features.wideLines);
+    _vkManager->printDebug();
 
     createCommandPool();
     if (m_commandPool == VK_NULL_HANDLE || m_commandBuffer == VK_NULL_HANDLE) {
@@ -181,38 +144,38 @@ void VulkanRenderNode::initVulkan()
     m_initialized = true;
 }
 
-void VulkanRenderNode::createCommandPool()
-{
-    // Find graphics queue family
-    uint32_t queueFamilyIndex = findGraphicsQueueFamily(m_physicalDevice);
+// void VulkanRenderNode::createCommandPool()
+// {
+//     // Find graphics queue family
+//     uint32_t queueFamilyIndex = findGraphicsQueueFamily(m_physicalDevice);
 
-    // Get the graphics queue
-    // m_devFuncs->vkGetDeviceQueue(m_device, queueFamilyIndex, 0, &m_graphicsQueue);
+//     // Get the graphics queue
+//     // m_devFuncs->vkGetDeviceQueue(m_device, queueFamilyIndex, 0, &m_graphicsQueue);
 
-    // Create command pool
-    VkCommandPoolCreateInfo poolInfo = {};
-    poolInfo.sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO;
-    poolInfo.queueFamilyIndex = queueFamilyIndex;
-    poolInfo.flags = VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT;
+//     // Create command pool
+//     VkCommandPoolCreateInfo poolInfo = {};
+//     poolInfo.sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO;
+//     poolInfo.queueFamilyIndex = queueFamilyIndex;
+//     poolInfo.flags = VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT;
 
-    VkResult result = m_devFuncs->vkCreateCommandPool(m_device, &poolInfo, nullptr, &m_commandPool);
-    if (result != VK_SUCCESS) {
-        qWarning("Failed to create command pool: %d", result);
-        return;
-    }
+//     VkResult result = m_devFuncs->vkCreateCommandPool(m_device, &poolInfo, nullptr, &m_commandPool);
+//     if (result != VK_SUCCESS) {
+//         qWarning("Failed to create command pool: %d", result);
+//         return;
+//     }
 
-    // Allocate command buffer
-    VkCommandBufferAllocateInfo allocInfo = {};
-    allocInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
-    allocInfo.commandPool = m_commandPool;
-    allocInfo.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
-    allocInfo.commandBufferCount = 1;
+//     // Allocate command buffer
+//     VkCommandBufferAllocateInfo allocInfo = {};
+//     allocInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
+//     allocInfo.commandPool = m_commandPool;
+//     allocInfo.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
+//     allocInfo.commandBufferCount = 1;
 
-    result = m_devFuncs->vkAllocateCommandBuffers(m_device, &allocInfo, &m_commandBuffer);
-    if (result != VK_SUCCESS) {
-        qWarning("Failed to allocate command buffer: %d", result);
-    }
-}
+//     result = m_devFuncs->vkAllocateCommandBuffers(m_device, &allocInfo, &m_commandBuffer);
+//     if (result != VK_SUCCESS) {
+//         qWarning("Failed to allocate command buffer: %d", result);
+//     }
+// }
 
 void VulkanRenderNode::createLineVertexBuffer()
 {

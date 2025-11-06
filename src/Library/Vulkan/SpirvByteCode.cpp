@@ -2,7 +2,7 @@
 #include <cstdint>
 #include <vector>
 
-namespace Files {
+namespace Vulkan {
 
 SpirvByteCode::SpirvByteCode(const std::vector<uint32_t>& byteCode) :
     _byteCode(byteCode)
@@ -29,6 +29,11 @@ size_t SpirvByteCode::size() const noexcept
 }
 
 uint32_t* SpirvByteCode::data() noexcept
+{
+    return _byteCode.data();
+}
+
+const uint32_t* SpirvByteCode::data() const noexcept
 {
     return _byteCode.data();
 }

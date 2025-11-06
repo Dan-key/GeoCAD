@@ -5,9 +5,12 @@
 #include <QVulkanInstance>
 #include <QVulkanFunctions>
 #include <QVulkanDeviceFunctions>
+#include <memory>
+#include <qquickitem.h>
 
 #include "Geometry/Line.h"
-#include "Library/Files/SpirvByteCode.h"
+#include "Library/Vulkan/SpirvByteCode.h"
+#include "Library/Vulkan/VulkanManager.h"
 
 class VulkanRenderNode : public QSGRenderNode
 {
@@ -26,8 +29,9 @@ public:
 
     static float z;
     static QPointF pos;
+
 private:
-    void initVulkan();
+    void initVulkan(QQuickItem* item);
     void createCommandPool();
     void createTriangleVertexBuffer();
     void createLineVertexBuffer();
@@ -49,12 +53,8 @@ private:
     void drawNet(VkCommandBuffer);
     void drawAddedLines(VkCommandBuffer);
 
-    QQuickItem *m_item;
-    QVulkanInstance *m_vulkanInstance = nullptr;
-    QVulkanDeviceFunctions *m_devFuncs = nullptr;
-    
-    VkDevice m_device = VK_NULL_HANDLE;
-    VkPhysicalDevice m_physicalDevice = VK_NULL_HANDLE;
+    std::shared_ptr<Vulkan::VulkanManager> _vkManager;
+
     VkQueue m_graphicsQueue = VK_NULL_HANDLE;
     VkCommandBuffer m_commandBuffer = VK_NULL_HANDLE;
     VkCommandPool m_commandPool = VK_NULL_HANDLE;
@@ -102,9 +102,9 @@ private:
     bool m_verticesDirty = false;
     bool m_verticesAddedLinesDirty = true;
 
-    Files::SpirvByteCode vertShaderCode;
-    Files::SpirvByteCode fragShaderCode;
-    Files::SpirvByteCode fragDashShaderCode;
-    Files::SpirvByteCode fragCircleShaderCode;
-    Files::SpirvByteCode vertCircleShaderCode;
+    Vulkan::SpirvByteCode vertShaderCode;
+    Vulkan::SpirvByteCode fragShaderCode;
+    Vulkan::SpirvByteCode fragDashShaderCode;
+    Vulkan::SpirvByteCode fragCircleShaderCode;
+    Vulkan::SpirvByteCode vertCircleShaderCode;
 };
