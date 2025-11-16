@@ -38,7 +38,17 @@ std::string queueFamiliesFlagsToString(VkQueueFlags flags)
 float VulkanRenderNode::z = 1.0f;
 QPointF VulkanRenderNode::pos = {0, 0};
 
-VulkanRenderNode::VulkanRenderNode(QQuickItem *item)
+VulkanRenderNode::VulkanRenderNode(QQuickItem *item) :
+    _vkManager(std::make_shared<Vulkan::VulkanManager>(item)),
+    bufferTriangle(_vkManager),
+    bufferLine(_vkManager),
+    bufferNet(_vkManager),
+    bufferAddedLines(_vkManager),
+    m_vertShaderModule(_vkManager),
+    m_fragShaderModule(_vkManager),
+    m_fragDashShaderModule(_vkManager),
+    m_vertCircleModule(_vkManager),
+    m_fragCircleModule(_vkManager)
 {
     Files::FileStream vertFS("shaders/vertex.spv");
     Files::FileStream fragFS("shaders/frag.spv");
@@ -51,6 +61,8 @@ VulkanRenderNode::VulkanRenderNode(QQuickItem *item)
     fragDashShaderCode = fragDashFS.getSpirvByteCode();
     vertCircleShaderCode = vertCircleFS.getSpirvByteCode();
     fragCircleShaderCode = fragCircleFS.getSpirvByteCode();
+
+    initVulkan(item);
 }
 
 VulkanRenderNode::~VulkanRenderNode()
@@ -93,12 +105,6 @@ void VulkanRenderNode::initVulkan(QQuickItem* item)
     if (m_initialized)
         return;
 
-    try {
-        _vkManager = std::make_shared<Vulkan::VulkanManager>(item);
-    } catch (const std::exception& excp) {
-        qWarning() << excp.what();
-    }
-
     _vkManager->printDebug();
 
     createCommandPool();
@@ -107,29 +113,31 @@ void VulkanRenderNode::initVulkan(QQuickItem* item)
         return;
     }
 
-    createTriangleVertexBuffer();
-    if (m_vertexTriangleBuffer == VK_NULL_HANDLE) {
-        qWarning("Failed to create triangle vertex buffer!");
-        return;
-    }
+    createBuffer();
 
-    createLineVertexBuffer();
-    if (m_vertexLineBuffer == VK_NULL_HANDLE) {
-        qWarning("Failed to create line vertex buffer!");
-        return;
-    }
+    // createTriangleVertexBuffer();
+    // if (m_vertexTriangleBuffer == VK_NULL_HANDLE) {
+    //     qWarning("Failed to create triangle vertex buffer!");
+    //     return;
+    // }
 
-    createNetVertexBuffer();
-    if (m_vertexNetBuffer == VK_NULL_HANDLE) {
-        qWarning("Failed to create net vertex buffer!");
-        return;
-    }
+    // createLineVertexBuffer();
+    // if (m_vertexLineBuffer == VK_NULL_HANDLE) {
+    //     qWarning("Failed to create line vertex buffer!");
+    //     return;
+    // }
 
-    createAddedLinesVertexBuffer();
-    if (m_vertexAddedLinesBuffer == VK_NULL_HANDLE) {
-        qWarning("Failed to create net vertex buffer!");
-        return;
-    }
+    // createNetVertexBuffer();
+    // if (m_vertexNetBuffer == VK_NULL_HANDLE) {
+    //     qWarning("Failed to create net vertex buffer!");
+    //     return;
+    // }
+
+    // createAddedLinesVertexBuffer();
+    // if (m_vertexAddedLinesBuffer == VK_NULL_HANDLE) {
+    //     qWarning("Failed to create net vertex buffer!");
+    //     return;
+    // }
 
     createShaderModules();
     if (m_vertShaderModule == VK_NULL_HANDLE ||
@@ -144,41 +152,51 @@ void VulkanRenderNode::initVulkan(QQuickItem* item)
     m_initialized = true;
 }
 
-// void VulkanRenderNode::createCommandPool()
-// {
-//     // Find graphics queue family
-//     uint32_t queueFamilyIndex = findGraphicsQueueFamily(m_physicalDevice);
-
-//     // Get the graphics queue
-//     // m_devFuncs->vkGetDeviceQueue(m_device, queueFamilyIndex, 0, &m_graphicsQueue);
-
-//     // Create command pool
-//     VkCommandPoolCreateInfo poolInfo = {};
-//     poolInfo.sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO;
-//     poolInfo.queueFamilyIndex = queueFamilyIndex;
-//     poolInfo.flags = VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT;
-
-//     VkResult result = m_devFuncs->vkCreateCommandPool(m_device, &poolInfo, nullptr, &m_commandPool);
-//     if (result != VK_SUCCESS) {
-//         qWarning("Failed to create command pool: %d", result);
-//         return;
-//     }
-
-//     // Allocate command buffer
-//     VkCommandBufferAllocateInfo allocInfo = {};
-//     allocInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
-//     allocInfo.commandPool = m_commandPool;
-//     allocInfo.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
-//     allocInfo.commandBufferCount = 1;
-
-//     result = m_devFuncs->vkAllocateCommandBuffers(m_device, &allocInfo, &m_commandBuffer);
-//     if (result != VK_SUCCESS) {
-//         qWarning("Failed to allocate command buffer: %d", result);
-//     }
-// }
-
-void VulkanRenderNode::createLineVertexBuffer()
+void VulkanRenderNode::createCommandPool()
 {
+    // Find graphics queue family
+    uint32_t queueFamilyIndex = findGraphicsQueueFamily(_vkManager->physicalDevice());
+
+    // Get the graphics queue
+    // _vkManager->devFuncs()->vkGetDeviceQueue(_vkManager->device(), queueFamilyIndex, 0, &m_graphicsQueue);
+
+    // Create command pool
+    VkCommandPoolCreateInfo poolInfo = {};
+    poolInfo.sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO;
+    poolInfo.queueFamilyIndex = queueFamilyIndex;
+    poolInfo.flags = VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT;
+
+    VkResult result = _vkManager->vkCreateCommandPool(&poolInfo, nullptr, &m_commandPool);
+    if (result != VK_SUCCESS) {
+        qWarning("Failed to create command pool: %d", result);
+        return;
+    }
+
+    // Allocate command buffer
+    VkCommandBufferAllocateInfo allocInfo = {};
+    allocInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
+    allocInfo.commandPool = m_commandPool;
+    allocInfo.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
+    allocInfo.commandBufferCount = 1;
+
+    result = _vkManager->vkAllocateCommandBuffers(&allocInfo, &m_commandBuffer);
+    if (result != VK_SUCCESS) {
+        qWarning("Failed to allocate command buffer: %d", result);
+    }
+}
+
+void VulkanRenderNode::createBuffer()
+{
+    m_verticesTriangle = {
+        {{0.0f, -0.05f}, {1.0f, 0.0f, 0.0f}},  // Top - Red
+        {{0.05f, 0.05f}, {0.0f, 1.0f, 0.0f}},   // Right - Green
+        {{-0.05f, 0.05f}, {0.0f, 0.0f, 1.0f}}   // Left - Blue
+    };
+
+    bufferTriangle.allocateMemory(m_verticesTriangle.size() * sizeof(decltype(m_verticesTriangle)::value_type));
+    bufferTriangle.updateMemory(0, m_verticesTriangle.data(),
+                        m_verticesTriangle.size() * sizeof(decltype(m_verticesTriangle)::value_type));
+
     m_verticesLine = {
         {{0.0f, -100.0f}, {0.2f, 0.2f, 0.7f}},
         {{0.0f, 100.0f}, {0.2f, 0.2f, 0.7f}},
@@ -186,35 +204,10 @@ void VulkanRenderNode::createLineVertexBuffer()
         {{100.0f, 0.0f}, {0.2f, 0.2f, 0.7f}}
     };
 
-    VkBufferCreateInfo bufferInfo = {};
-    bufferInfo.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
-    bufferInfo.size = m_verticesLine.size() * sizeof(decltype(m_verticesLine)::value_type);
-    bufferInfo.usage = VK_BUFFER_USAGE_VERTEX_BUFFER_BIT;
-    bufferInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
+    bufferLine.allocateMemory(m_verticesLine.size() * sizeof(decltype(m_verticesLine)::value_type));
+    bufferLine.updateMemory(0, m_verticesLine.data(),
+                        m_verticesLine.size() * sizeof(decltype(m_verticesLine)::value_type));
 
-    m_devFuncs->vkCreateBuffer(m_device, &bufferInfo, nullptr, &m_vertexLineBuffer);
-
-    VkMemoryRequirements memRequirements;
-    m_devFuncs->vkGetBufferMemoryRequirements(m_device, m_vertexLineBuffer, &memRequirements);
-
-    VkMemoryAllocateInfo allocInfo = {};
-    allocInfo.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
-    allocInfo.allocationSize = memRequirements.size;
-    allocInfo.memoryTypeIndex = findMemoryType(m_physicalDevice, memRequirements.memoryTypeBits,
-        VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
-
-    m_devFuncs->vkAllocateMemory(m_device, &allocInfo, nullptr, &m_vertexLineBufferMemory);
-    m_devFuncs->vkBindBufferMemory(m_device, m_vertexLineBuffer, m_vertexLineBufferMemory, 0);
-
-    void* data;
-    m_devFuncs->vkMapMemory(m_device, m_vertexLineBufferMemory, 0, bufferInfo.size, 0, &data);
-    memcpy(data, m_verticesLine.data() , m_verticesLine.size() * sizeof(decltype(m_verticesLine)::value_type));
-    m_devFuncs->vkUnmapMemory(m_device, m_vertexLineBufferMemory);
-}
-
-void VulkanRenderNode::createNetVertexBuffer()
-{
-    //vertical
     for (float i = -100; i <= 100; i+=0.1) {
         m_verticesNet.push_back({{i, 100.0f}, {0.2f, 0.2f, 0.6f}});
         m_verticesNet.push_back({{i, -100.0f}, {0.2f, 0.2f, 0.6f}});
@@ -223,96 +216,11 @@ void VulkanRenderNode::createNetVertexBuffer()
         m_verticesNet.push_back({{-100.0f, i}, {0.2f, 0.2f, 0.6f}});
     }
 
-    VkBufferCreateInfo bufferInfo = {};
-    bufferInfo.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
-    bufferInfo.size = m_verticesNet.size() * sizeof(decltype(m_verticesNet)::value_type);
-    bufferInfo.usage = VK_BUFFER_USAGE_VERTEX_BUFFER_BIT;
-    bufferInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
+    bufferNet.allocateMemory(m_verticesNet.size() * sizeof(decltype(m_verticesNet)::value_type));
+    bufferNet.updateMemory(0, m_verticesNet.data(),
+                        m_verticesNet.size() * sizeof(decltype(m_verticesNet)::value_type));
 
-    m_devFuncs->vkCreateBuffer(m_device, &bufferInfo, nullptr, &m_vertexNetBuffer);
-
-    VkMemoryRequirements memRequirements;
-    m_devFuncs->vkGetBufferMemoryRequirements(m_device, m_vertexNetBuffer, &memRequirements);
-
-    VkMemoryAllocateInfo allocInfo = {};
-    allocInfo.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
-    allocInfo.allocationSize = memRequirements.size;
-    allocInfo.memoryTypeIndex = findMemoryType(m_physicalDevice, memRequirements.memoryTypeBits,
-        VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
-
-    m_devFuncs->vkAllocateMemory(m_device, &allocInfo, nullptr, &m_vertexNetBufferMemory);
-    m_devFuncs->vkBindBufferMemory(m_device, m_vertexNetBuffer, m_vertexNetBufferMemory, 0);
-
-    void* data;
-    m_devFuncs->vkMapMemory(m_device, m_vertexNetBufferMemory, 0, bufferInfo.size, 0, &data);
-    memcpy(data, m_verticesNet.data() , m_verticesNet.size() * sizeof(decltype(m_verticesNet)::value_type));
-    m_devFuncs->vkUnmapMemory(m_device, m_vertexNetBufferMemory);
-}
-
-void VulkanRenderNode::createAddedLinesVertexBuffer()
-{
-    //vertical
-
-    VkBufferCreateInfo bufferInfo = {};
-    bufferInfo.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
-    bufferInfo.size = 1000 * sizeof(decltype(m_verticesAddedLines)::value_type);
-    bufferInfo.usage = VK_BUFFER_USAGE_VERTEX_BUFFER_BIT;
-    bufferInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
-
-    m_devFuncs->vkCreateBuffer(m_device, &bufferInfo, nullptr, &m_vertexAddedLinesBuffer);
-
-    VkMemoryRequirements memRequirements;
-    m_devFuncs->vkGetBufferMemoryRequirements(m_device, m_vertexAddedLinesBuffer, &memRequirements);
-
-    VkMemoryAllocateInfo allocInfo = {};
-    allocInfo.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
-    allocInfo.allocationSize = memRequirements.size;
-    allocInfo.memoryTypeIndex = findMemoryType(m_physicalDevice, memRequirements.memoryTypeBits,
-        VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
-
-    m_devFuncs->vkAllocateMemory(m_device, &allocInfo, nullptr, &m_vertexAddedLinesBufferMemory);
-    m_devFuncs->vkBindBufferMemory(m_device, m_vertexAddedLinesBuffer, m_vertexAddedLinesBufferMemory, 0);
-
-    void* data;
-    m_devFuncs->vkMapMemory(m_device, m_vertexAddedLinesBufferMemory, 0, bufferInfo.size, 0, &data);
-    memcpy(data, m_verticesAddedLines.data() , m_verticesAddedLines.size() * sizeof(decltype(m_verticesAddedLines)::value_type));
-    m_devFuncs->vkUnmapMemory(m_device, m_vertexAddedLinesBufferMemory);
-}
-
-void VulkanRenderNode::createTriangleVertexBuffer()
-{
-    // Triangle vertices with colors (position XY, color RGB)
-    m_verticesTriangle = {
-        {{0.0f, -0.05f}, {1.0f, 0.0f, 0.0f}},  // Top - Red
-        {{0.05f, 0.05f}, {0.0f, 1.0f, 0.0f}},   // Right - Green
-        {{-0.05f, 0.05f}, {0.0f, 0.0f, 1.0f}}   // Left - Blue
-    };
-
-
-    VkBufferCreateInfo bufferInfo = {};
-    bufferInfo.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
-    bufferInfo.size = m_verticesTriangle.size() * sizeof(decltype(m_verticesTriangle)::value_type);
-    bufferInfo.usage = VK_BUFFER_USAGE_VERTEX_BUFFER_BIT;
-    bufferInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
-
-    m_devFuncs->vkCreateBuffer(m_device, &bufferInfo, nullptr, &m_vertexTriangleBuffer);
-
-    VkMemoryRequirements memRequirements;
-    m_devFuncs->vkGetBufferMemoryRequirements(m_device, m_vertexTriangleBuffer, &memRequirements);
-
-    VkMemoryAllocateInfo allocInfo = {};
-    allocInfo.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
-    allocInfo.allocationSize = memRequirements.size;
-    allocInfo.memoryTypeIndex = findMemoryType(m_physicalDevice, memRequirements.memoryTypeBits,
-        VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
-
-    m_devFuncs->vkAllocateMemory(m_device, &allocInfo, nullptr, &m_vertexTriangleBufferMemory);
-    m_devFuncs->vkBindBufferMemory(m_device, m_vertexTriangleBuffer, m_vertexTriangleBufferMemory, 0);
-
-    void* data;
-    m_devFuncs->vkMapMemory(m_device, m_vertexTriangleBufferMemory, 0, bufferInfo.size, 0, &data);
-    memcpy(data, m_verticesTriangle.data() , m_verticesTriangle.size() * sizeof(decltype(m_verticesTriangle)::value_type));
-    m_devFuncs->vkUnmapMemory(m_device, m_vertexTriangleBufferMemory);
+    bufferAddedLines.allocateMemory(1000 * sizeof(decltype(m_verticesAddedLines)::value_type));
 }
 
 void VulkanRenderNode::addLine(const Geometry::Line& line)
@@ -329,66 +237,11 @@ void VulkanRenderNode::updateLine(const Geometry::Line& line)
 
 void VulkanRenderNode::createShaderModules()
 {
-    VkShaderModuleCreateInfo createInfo = {};
-    createInfo.sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO;
-
-    // Vertex shader
-    createInfo.codeSize = vertShaderCode.size();
-    createInfo.pCode = vertShaderCode.data();
-
-    qDebug("Creating vertex shader module, size: %zu bytes", vertShaderCode.size());
-    VkResult result = m_devFuncs->vkCreateShaderModule(m_device, &createInfo, nullptr, &m_vertShaderModule);
-    if (result != VK_SUCCESS) {
-        qWarning("Failed to create vertex shader module: %d", result);
-        return;
-    }
-    qDebug("Vertex shader module created: %p", m_vertShaderModule);
-
-    // Fragment shader
-    createInfo.codeSize = fragShaderCode.size();
-    createInfo.pCode = fragShaderCode.data();
-
-    qDebug("Creating fragment shader module, size: %zu bytes", fragShaderCode.size());
-    result = m_devFuncs->vkCreateShaderModule(m_device, &createInfo, nullptr, &m_fragShaderModule);
-    if (result != VK_SUCCESS) {
-        qWarning("Failed to create fragment shader module: %d", result);
-        return;
-    }
-    qDebug("Fragment shader module created: %p", m_fragShaderModule);
-
-    createInfo.codeSize = fragDashShaderCode.size();
-    createInfo.pCode = fragDashShaderCode.data();
-
-    qDebug("Creating fragment dash shader module, size: %zu bytes", fragDashShaderCode.size());
-    result = m_devFuncs->vkCreateShaderModule(m_device, &createInfo, nullptr, &m_fragDashShaderModule);
-    if (result != VK_SUCCESS) {
-        qWarning("Failed to create fragment dashshader module: %d", result);
-        return;
-    }
-
-    createInfo.codeSize = vertCircleShaderCode.size();
-    createInfo.pCode = vertCircleShaderCode.data();
-
-    qDebug("Creating vertex circle shader module, size: %zu bytes", vertCircleShaderCode.size());
-
-    result = m_devFuncs->vkCreateShaderModule(m_device, &createInfo, nullptr, &m_vertCircleModule);
-    if (result != VK_SUCCESS) {
-        qWarning("Failed to create fragment cicle module: %d", result);
-        return;
-    }
-    qDebug("Vertex circle shader module created: %p", m_vertCircleModule);
-
-    createInfo.codeSize = fragCircleShaderCode.size();
-    createInfo.pCode = fragCircleShaderCode.data();
-
-    qDebug("Creating fragment circle shader module, size: %zu bytes", fragCircleShaderCode.size());
-
-    result = m_devFuncs->vkCreateShaderModule(m_device, &createInfo, nullptr, &m_fragCircleModule);
-    if (result != VK_SUCCESS) {
-        qWarning("Failed to create fragment cicle module: %d", result);
-        return;
-    }
-    qDebug("Fragment circle shader module created: %p", m_fragCircleModule);
+    m_vertShaderModule.setShader(vertShaderCode);
+    m_fragShaderModule.setShader(fragShaderCode);
+    m_fragDashShaderModule.setShader(fragDashShaderCode);
+    m_vertCircleModule.setShader(vertCircleShaderCode);
+    m_fragCircleModule.setShader(fragCircleShaderCode);
 }
 
 void VulkanRenderNode::createTrianglePipeline(VkRenderPass renderPass)
@@ -407,12 +260,12 @@ void VulkanRenderNode::createTrianglePipeline(VkRenderPass renderPass)
     qDebug("Creating graphics pipeline with render pass %p", renderPass);
 
     // Verify all prerequisites
-    if (!m_devFuncs) {
-        qWarning("No device functions!");
-        return;
-    }
+    // if (!m_devFuncs) {
+    //     qWarning("No device functions!");
+    //     return;
+    // }
 
-    if (m_device == VK_NULL_HANDLE) {
+    if (_vkManager->device() == VK_NULL_HANDLE) {
         qWarning("No device!");
         return;
     }
@@ -576,7 +429,7 @@ void VulkanRenderNode::createTrianglePipeline(VkRenderPass renderPass)
         pipelineLayoutInfo.setLayoutCount = 0;
         pipelineLayoutInfo.pSetLayouts = nullptr;
 
-        result = m_devFuncs->vkCreatePipelineLayout(m_device, &pipelineLayoutInfo, nullptr, &m_pipelineTriangleLayout);
+        result = _vkManager->vkCreatePipelineLayout(&pipelineLayoutInfo, nullptr, &m_pipelineTriangleLayout);
         if (result != VK_SUCCESS) {
             qWarning("Failed to create pipeline layout: %d", result);
             return;
@@ -606,14 +459,7 @@ void VulkanRenderNode::createTrianglePipeline(VkRenderPass renderPass)
     pipelineInfo.basePipelineHandle = VK_NULL_HANDLE;
     pipelineInfo.basePipelineIndex = -1;
 
-    qDebug("Calling vkCreateGraphicsPipelines...");
-    qDebug("  Device: %p", m_device);
-    qDebug("  Pipeline layout: %p", m_pipelineTriangleLayout);
-    qDebug("  Render pass: %p", renderPass);
-    qDebug("  Vert shader: %p", m_vertShaderModule);
-    qDebug("  Frag shader: %p", m_fragShaderModule);
-
-    result = m_devFuncs->vkCreateGraphicsPipelines(m_device, VK_NULL_HANDLE, 1,
+    result = _vkManager->vkCreateGraphicsPipelines(VK_NULL_HANDLE, 1,
                                                    &pipelineInfo, nullptr,
                                                    &m_graphicsTrianglePipeline);
     if (result != VK_SUCCESS) {
@@ -641,16 +487,6 @@ void VulkanRenderNode::createLinePipeline(VkRenderPass renderPass)
 
     qDebug("Creating graphics pipeline with render pass %p", renderPass);
 
-    // Verify all prerequisites
-    if (!m_devFuncs) {
-        qWarning("No device functions!");
-        return;
-    }
-
-    if (m_device == VK_NULL_HANDLE) {
-        qWarning("No device!");
-        return;
-    }
 
     if (m_vertShaderModule == VK_NULL_HANDLE || m_fragShaderModule == VK_NULL_HANDLE) {
         qWarning("Shader modules not created!");
@@ -786,7 +622,7 @@ void VulkanRenderNode::createLinePipeline(VkRenderPass renderPass)
 
     // Dynamic state
     VkDynamicState dynamicStates[] = {
-        VK_DYNAMIC_STATE_VIEWPORT, 
+        VK_DYNAMIC_STATE_VIEWPORT,
         VK_DYNAMIC_STATE_SCISSOR,
         VK_DYNAMIC_STATE_LINE_WIDTH
     };
@@ -812,7 +648,7 @@ void VulkanRenderNode::createLinePipeline(VkRenderPass renderPass)
         pipelineLayoutInfo.setLayoutCount = 0;
         pipelineLayoutInfo.pSetLayouts = nullptr;
 
-        result = m_devFuncs->vkCreatePipelineLayout(m_device, &pipelineLayoutInfo, nullptr, &m_pipelineLineLayout);
+        result = _vkManager->vkCreatePipelineLayout( &pipelineLayoutInfo, nullptr, &m_pipelineLineLayout);
         if (result != VK_SUCCESS) {
             qWarning("Failed to create pipeline layout: %d", result);
             return;
@@ -842,14 +678,7 @@ void VulkanRenderNode::createLinePipeline(VkRenderPass renderPass)
     pipelineInfo.basePipelineHandle = VK_NULL_HANDLE;
     pipelineInfo.basePipelineIndex = -1;
 
-    qDebug("Calling vkCreateGraphicsPipelines...");
-    qDebug("  Device: %p", m_device);
-    qDebug("  Pipeline layout: %p", m_pipelineTriangleLayout);
-    qDebug("  Render pass: %p", renderPass);
-    qDebug("  Vert shader: %p", m_vertShaderModule);
-    qDebug("  Frag shader: %p", m_fragShaderModule);
-
-    result = m_devFuncs->vkCreateGraphicsPipelines(m_device, VK_NULL_HANDLE, 1, &pipelineInfo, nullptr, &m_graphicsLinePipeline);
+    result = _vkManager->vkCreateGraphicsPipelines(VK_NULL_HANDLE, 1, &pipelineInfo, nullptr, &m_graphicsLinePipeline);
     if (result != VK_SUCCESS) {
         qWarning("Failed to create graphics pipeline: %d", result);
         m_graphicsLinePipeline = VK_NULL_HANDLE;
@@ -875,16 +704,6 @@ void VulkanRenderNode::createCirclePipeline(VkRenderPass renderPass)
 
     qDebug("Creating graphics pipeline with render pass %p", renderPass);
 
-    // Verify all prerequisites
-    if (!m_devFuncs) {
-        qWarning("No device functions!");
-        return;
-    }
-
-    if (m_device == VK_NULL_HANDLE) {
-        qWarning("No device!");
-        return;
-    }
 
     // if (m_vertShaderModule == VK_NULL_HANDLE || m_fragShaderModule == VK_NULL_HANDLE) {
     //     qWarning("Shader modules not created!");
@@ -1051,7 +870,7 @@ void VulkanRenderNode::createCirclePipeline(VkRenderPass renderPass)
         pipelineLayoutInfo.setLayoutCount = 0;
         pipelineLayoutInfo.pSetLayouts = nullptr;
 
-        result = m_devFuncs->vkCreatePipelineLayout(m_device, &pipelineLayoutInfo, nullptr, &m_pipelineCircleLayout);
+        result = _vkManager->vkCreatePipelineLayout( &pipelineLayoutInfo, nullptr, &m_pipelineCircleLayout);
         if (result != VK_SUCCESS) {
             qWarning("Failed to create pipeline layout: %d", result);
             return;
@@ -1081,14 +900,14 @@ void VulkanRenderNode::createCirclePipeline(VkRenderPass renderPass)
     pipelineInfo.basePipelineHandle = VK_NULL_HANDLE;
     pipelineInfo.basePipelineIndex = -1;
 
-    qDebug("Calling vkCreateGraphicsPipelines...");
-    qDebug("  Device: %p", m_device);
-    qDebug("  Pipeline layout: %p", m_pipelineCircleLayout);
-    qDebug("  Render pass: %p", renderPass);
-    qDebug("  Vert shader: %p", m_vertCircleModule);
-    qDebug("  Frag shader: %p", m_fragCircleModule);
+    // qDebug("Calling vkCreateGraphicsPipelines...");
+    // qDebug("  Device: %p", _vkManager->device());
+    // qDebug("  Pipeline layout: %p", m_pipelineCircleLayout);
+    // qDebug("  Render pass: %p", renderPass);
+    // qDebug("  Vert shader: %p", m_vertCircleModule);
+    // qDebug("  Frag shader: %p", m_fragCircleModule);
 
-    result = m_devFuncs->vkCreateGraphicsPipelines(m_device, VK_NULL_HANDLE, 1, &pipelineInfo, nullptr, &m_graphicsCirclePipeline);
+    result = _vkManager->vkCreateGraphicsPipelines(VK_NULL_HANDLE, 1, &pipelineInfo, nullptr, &m_graphicsCirclePipeline);
     if (result != VK_SUCCESS) {
         qWarning("Failed to create graphics pipeline: %d", result);
         m_graphicsCirclePipeline = VK_NULL_HANDLE;
@@ -1101,33 +920,26 @@ void VulkanRenderNode::createCirclePipeline(VkRenderPass renderPass)
 
 void VulkanRenderNode::updateVertexBuffer()
 {
-    if (!m_verticesDirty || m_vertexTriangleBuffer == VK_NULL_HANDLE)
-        return;
-
-    void* data;
-    VkResult result = m_devFuncs->vkMapMemory(m_device, m_vertexTriangleBufferMemory, 0, 
-                                             sizeof(Geometry::Vertex) * m_verticesTriangle.size(), 0, &data);
-    if (result == VK_SUCCESS) {
-        memcpy(data, m_verticesTriangle.data(), sizeof(Geometry::Vertex) * m_verticesTriangle.size());
-        m_devFuncs->vkUnmapMemory(m_device, m_vertexTriangleBufferMemory);
-        m_verticesDirty = false;
-    }
+    bufferTriangle.updateMemory(0, m_verticesTriangle.data(), m_verticesTriangle.size() * sizeof(decltype(m_verticesTriangle)::value_type));
 }
 
 void VulkanRenderNode::updateVertexAddedLinesBuffer()
 {
-    if (m_vertexAddedLinesBuffer == VK_NULL_HANDLE)
-        return;
+    // if (m_vertexAddedLinesBuffer == VK_NULL_HANDLE)
+    //     return;
 
-    void* data;
+    // void* data;
 
-    VkResult result = m_devFuncs->vkMapMemory(m_device, m_vertexAddedLinesBufferMemory, (m_verticesAddedLines.size() - 1)*sizeof(m_verticesAddedLines[0]), 
-                                             sizeof(Geometry::Line) * m_verticesAddedLines.size(), 0, &data);
-    if (result == VK_SUCCESS) {
-        memcpy(data, &m_verticesAddedLines[m_verticesAddedLines.size() -1], sizeof(Geometry::Line));
-        m_devFuncs->vkUnmapMemory(m_device, m_vertexAddedLinesBufferMemory);
-        m_verticesAddedLinesDirty = false;
-    }
+    // VkResult result = _vkManager->devFuncs()->vkMapMemory(_vkManager->device(), m_vertexAddedLinesBufferMemory, (m_verticesAddedLines.size() - 1)*sizeof(m_verticesAddedLines[0]), 
+    //                                          sizeof(Geometry::Line) * m_verticesAddedLines.size(), 0, &data);
+    // if (result == VK_SUCCESS) {
+    //     memcpy(data, &m_verticesAddedLines[m_verticesAddedLines.size() -1], sizeof(Geometry::Line));
+    //     _vkManager->devFuncs()->vkUnmapMemory(_vkManager->device(), m_vertexAddedLinesBufferMemory);
+    //     m_verticesAddedLinesDirty = false;
+    // }
+
+    bufferAddedLines.updateMemory((m_verticesAddedLines.size() - 1) * sizeof(decltype(m_verticesAddedLines)::value_type), &m_verticesAddedLines[m_verticesAddedLines.size()-1], sizeof(decltype(m_verticesAddedLines)::value_type));
+    m_verticesAddedLinesDirty = false;
 }
 
 void VulkanRenderNode::updateVertexPosition(const QPointF& position)
@@ -1135,8 +947,8 @@ void VulkanRenderNode::updateVertexPosition(const QPointF& position)
     // qDebug() << "Updating vertex position to:" << position;
     if (m_verticesTriangle.size() >= 1) {
 
-        double x = (position.x() / m_item->width()) * 2.0 - 1.0;
-        double y = (position.y() / m_item->height()) * 2.0 - 1.0;
+        double x = (position.x() / _vkManager->item()->width()) * 2.0 - 1.0;
+        double y = (position.y() / _vkManager->item()->height()) * 2.0 - 1.0;
 
         m_verticesTriangle[0].pos[0] = static_cast<float>(x);
         m_verticesTriangle[0].pos[1] = static_cast<float>(y);
@@ -1150,23 +962,11 @@ void VulkanRenderNode::updateVertexPosition(const QPointF& position)
 
 void VulkanRenderNode::render(const RenderState *state)
 {
-    if (!m_initialized)
-        initVulkan();
-
     if (!m_initialized || m_commandBuffer == VK_NULL_HANDLE)
         return;
 
-    // Get the current render pass from Qt at render time
-    QQuickWindow *window = m_item->window();
-    if (!window)
-        return;
 
-    QSGRendererInterface *rif = window->rendererInterface();
-    if (!rif)
-        return;
-
-    VkRenderPass currentRenderPass = *static_cast<VkRenderPass *>(
-        rif->getResource(window, QSGRendererInterface::RenderPassResource));
+    VkRenderPass currentRenderPass = *_vkManager->getResource<VkRenderPass>(QSGRendererInterface::RenderPassResource);
 
     if (currentRenderPass == VK_NULL_HANDLE) {
         qWarning("Invalid render pass at render time!");
@@ -1191,17 +991,8 @@ void VulkanRenderNode::render(const RenderState *state)
 
 void VulkanRenderNode::recordCommandBuffer(const RenderState *state)
 {
-    // Get Qt's current command buffer
-    QQuickWindow *window = m_item->window();
-    if (!window)
-        return;
 
-    QSGRendererInterface *rif = window->rendererInterface();
-    if (!rif)
-        return;
-
-    VkCommandBuffer qtCommandBuffer = *static_cast<VkCommandBuffer *>(
-        rif->getResource(window, QSGRendererInterface::CommandListResource));
+    VkCommandBuffer qtCommandBuffer = *_vkManager->getResource<VkCommandBuffer>(QSGRendererInterface::CommandListResource);
 
     if (qtCommandBuffer == VK_NULL_HANDLE) {
         qWarning("No command buffer from Qt!");
@@ -1218,7 +1009,7 @@ void VulkanRenderNode::recordCommandBuffer(const RenderState *state)
 
 void VulkanRenderNode::drawTriangle(VkCommandBuffer commandBuffer)
 {
-    QQuickWindow *window = m_item->window();
+    QQuickWindow *window = _vkManager->item()->window();
 
     float time = QTime::currentTime().msecsSinceStartOfDay() % 10000;
     float angle = time;
@@ -1243,10 +1034,10 @@ void VulkanRenderNode::drawTriangle(VkCommandBuffer commandBuffer)
     );
 
     // Bind pipeline
-    m_devFuncs->vkCmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, m_graphicsTrianglePipeline);
+    _vkManager->vkCmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, m_graphicsTrianglePipeline);
 
     // Set viewport and scissor
-    QRectF rect = matrix()->mapRect(QRectF(0, 0, m_item->width(), m_item->height()));
+    QRectF rect = matrix()->mapRect(QRectF(0, 0, _vkManager->item()->width(), _vkManager->item()->height()));
     qreal dpr = window->devicePixelRatio();
     rect.setWidth(dpr*rect.width());
     rect.setHeight(dpr*rect.height());
@@ -1258,26 +1049,26 @@ void VulkanRenderNode::drawTriangle(VkCommandBuffer commandBuffer)
     viewport.height = rect.height();
     viewport.minDepth = 0.0f;
     viewport.maxDepth = 1.0f;
-    m_devFuncs->vkCmdSetViewport(commandBuffer, 0, 1, &viewport);
+    _vkManager->vkCmdSetViewport(commandBuffer, 0, 1, &viewport);
 
     VkRect2D scissor = {};
     scissor.offset = {(int32_t)rect.x(), (int32_t)rect.y()};
     scissor.extent = {(uint32_t)rect.width(), (uint32_t)rect.height()};
-    m_devFuncs->vkCmdSetScissor(commandBuffer, 0, 1, &scissor);
+   _vkManager->vkCmdSetScissor(commandBuffer, 0, 1, &scissor);
 
     // Bind vertex buffer
-    VkBuffer vertexBuffers[] = {m_vertexTriangleBuffer};
+    VkBuffer vertexBuffers[] = {bufferTriangle};
     VkDeviceSize offsets[] = {0};
-    m_devFuncs->vkCmdBindVertexBuffers(commandBuffer, 0, 1, vertexBuffers, offsets);
+    _vkManager->vkCmdBindVertexBuffers(commandBuffer, 0, 1, vertexBuffers, offsets);
 
     // Draw - this is now valid because we're in Qt's render pass
-    m_devFuncs->vkCmdDraw(commandBuffer, 3, 1, 0, 0);
+    _vkManager->vkCmdDraw(commandBuffer, 3, 1, 0, 0);
 
 }
 
 void VulkanRenderNode::drawNet(VkCommandBuffer commandBuffer)
 {
-    auto itemSize = m_item->size();
+    auto itemSize = _vkManager->item()->size();
 
     float time = QTime::currentTime().msecsSinceStartOfDay() % 10000;
     float angle = time;
@@ -1301,11 +1092,11 @@ void VulkanRenderNode::drawNet(VkCommandBuffer commandBuffer)
     );
 
     // Bind pipeline
-    m_devFuncs->vkCmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, m_graphicsLinePipeline);
+    _vkManager->vkCmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, m_graphicsLinePipeline);
 
     // Set viewport and scissor
-    QRectF rect = matrix()->mapRect(QRectF(0, 0, m_item->width(), m_item->height()));
-    qreal dpr = m_item->window()->devicePixelRatio();
+    QRectF rect = matrix()->mapRect(QRectF(0, 0, _vkManager->item()->width(), _vkManager->item()->height()));
+    qreal dpr = _vkManager->itemWindow()->devicePixelRatio();
     rect.setWidth(dpr*rect.width());
     rect.setHeight(dpr*rect.height());
     _viewPort= rect;
@@ -1316,26 +1107,25 @@ void VulkanRenderNode::drawNet(VkCommandBuffer commandBuffer)
     viewport.height = rect.height();
     viewport.minDepth = 0.0f;
     viewport.maxDepth = 1.0f;
-    m_devFuncs->vkCmdSetViewport(commandBuffer, 0, 1, &viewport);
+    _vkManager->vkCmdSetViewport(commandBuffer, 0, 1, &viewport);
 
     VkRect2D scissor = {};
     scissor.offset = {(int32_t)rect.x(), (int32_t)rect.y()};
     scissor.extent = {(uint32_t)rect.width(), (uint32_t)rect.height()};
-    m_devFuncs->vkCmdSetScissor(commandBuffer, 0, 1, &scissor);
+   _vkManager->vkCmdSetScissor(commandBuffer, 0, 1, &scissor);
 
-    m_devFuncs->vkCmdSetLineWidth(commandBuffer, 1);
+    _vkManager->vkCmdSetLineWidth(commandBuffer, 1);
 
-    VkBuffer vertexBuffers[] = {m_vertexNetBuffer};
+    VkBuffer vertexBuffers[] = {bufferNet};
     VkDeviceSize offsets[] = {0};
-    m_devFuncs->vkCmdBindVertexBuffers(commandBuffer, 0, 1, vertexBuffers, offsets);
+    _vkManager->vkCmdBindVertexBuffers(commandBuffer, 0, 1, vertexBuffers, offsets);
 
-    m_devFuncs->vkCmdDraw(commandBuffer, m_verticesNet.size(), 1, 0, 0);
-
+    _vkManager->vkCmdDraw(commandBuffer, m_verticesNet.size(), 1, 0, 0);
 }
 
 void VulkanRenderNode::drawAddedLines(VkCommandBuffer commandBuffer)
 {
-    auto itemSize = m_item->size();
+    auto itemSize = _vkManager->item()->size();
 
     QMatrix4x4 mvp = {};
     static float localZ = 1;
@@ -1356,11 +1146,11 @@ void VulkanRenderNode::drawAddedLines(VkCommandBuffer commandBuffer)
     );
 
     // Bind pipeline
-    m_devFuncs->vkCmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, m_graphicsLinePipeline);
+    _vkManager->vkCmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, m_graphicsLinePipeline);
 
     // Set viewport and scissor
-    QRectF rect = matrix()->mapRect(QRectF(0, 0, m_item->width(), m_item->height()));
-    qreal dpr = m_item->window()->devicePixelRatio();
+    QRectF rect = matrix()->mapRect(QRectF(0, 0, _vkManager->item()->width(), _vkManager->item()->height()));
+    qreal dpr = _vkManager->itemWindow()->devicePixelRatio();
     rect.setWidth(dpr*rect.width());
     rect.setHeight(dpr*rect.height());
     _viewPort= rect;
@@ -1371,26 +1161,26 @@ void VulkanRenderNode::drawAddedLines(VkCommandBuffer commandBuffer)
     viewport.height = rect.height();
     viewport.minDepth = 0.0f;
     viewport.maxDepth = 1.0f;
-    m_devFuncs->vkCmdSetViewport(commandBuffer, 0, 1, &viewport);
+    _vkManager->vkCmdSetViewport(commandBuffer, 0, 1, &viewport);
 
     VkRect2D scissor = {};
     scissor.offset = {(int32_t)rect.x(), (int32_t)rect.y()};
     scissor.extent = {(uint32_t)rect.width(), (uint32_t)rect.height()};
-    m_devFuncs->vkCmdSetScissor(commandBuffer, 0, 1, &scissor);
+   _vkManager->vkCmdSetScissor(commandBuffer, 0, 1, &scissor);
 
-    m_devFuncs->vkCmdSetLineWidth(commandBuffer, 3);
+    _vkManager->vkCmdSetLineWidth(commandBuffer, 3);
 
-    VkBuffer vertexBuffers[] = {m_vertexAddedLinesBuffer};
+    VkBuffer vertexBuffers[] = {bufferAddedLines};
     VkDeviceSize offsets[] = {0};
-    m_devFuncs->vkCmdBindVertexBuffers(commandBuffer, 0, 1, vertexBuffers, offsets);
+    _vkManager->vkCmdBindVertexBuffers(commandBuffer, 0, 1, vertexBuffers, offsets);
 
-    m_devFuncs->vkCmdDraw(commandBuffer, m_verticesAddedLines.size() * 2, 1, 0, 0);
+    _vkManager->vkCmdDraw(commandBuffer, m_verticesAddedLines.size() * 2, 1, 0, 0);
 
 }
 
 void VulkanRenderNode::drawLine(VkCommandBuffer commandBuffer)
 {
-    auto itemSize = m_item->size();
+    auto itemSize = _vkManager->item()->size();
 
 
     QMatrix4x4 i = {};
@@ -1405,9 +1195,9 @@ void VulkanRenderNode::drawLine(VkCommandBuffer commandBuffer)
         i.constData()
     );
 
-    m_devFuncs->vkCmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, m_graphicsLinePipeline);
-    QRectF rect = matrix()->mapRect(QRectF(0, 0, m_item->width(), m_item->height()));
-    qreal dpr = m_item->window()->devicePixelRatio();
+    _vkManager->vkCmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, m_graphicsLinePipeline);
+    QRectF rect = matrix()->mapRect(QRectF(0, 0, _vkManager->item()->width(), _vkManager->item()->height()));
+    qreal dpr = _vkManager->item()->window()->devicePixelRatio();
     rect.setWidth(dpr*rect.width());
     rect.setHeight(dpr*rect.height());
 
@@ -1418,121 +1208,121 @@ void VulkanRenderNode::drawLine(VkCommandBuffer commandBuffer)
     viewport.height = rect.height();
     viewport.minDepth = 0.0f;
     viewport.maxDepth = 1.0f;
-    m_devFuncs->vkCmdSetViewport(commandBuffer, 0, 1, &viewport);
+    _vkManager->vkCmdSetViewport(commandBuffer, 0, 1, &viewport);
 
     VkRect2D scissor = {};
     scissor.offset = {(int32_t)rect.x(), (int32_t)rect.y()};
     scissor.extent = {(uint32_t)rect.width(), (uint32_t)rect.height()};
-    m_devFuncs->vkCmdSetScissor(commandBuffer, 0, 1, &scissor);
+    _vkManager->vkCmdSetScissor(commandBuffer, 0, 1, &scissor);
 
-    m_devFuncs->vkCmdSetViewport(commandBuffer, 1, 1, &viewport);
+    _vkManager->vkCmdSetViewport(commandBuffer, 1, 1, &viewport);
 
-    m_devFuncs->vkCmdSetScissor(commandBuffer, 1, 1, &scissor);
+    _vkManager->vkCmdSetScissor(commandBuffer, 1, 1, &scissor);
 
-    VkBuffer vertexLineBuffers[] = {m_vertexLineBuffer};
-    m_devFuncs->vkCmdSetLineWidth(commandBuffer, 5);
+    VkBuffer vertexLineBuffers[] = {bufferLine};
+    _vkManager->vkCmdSetLineWidth(commandBuffer, 5);
     VkDeviceSize offsets[] = {0};
 
-    m_devFuncs->vkCmdBindVertexBuffers(commandBuffer, 0, 1, vertexLineBuffers, offsets);
+    _vkManager->vkCmdBindVertexBuffers(commandBuffer, 0, 1, vertexLineBuffers, offsets);
 
-    m_devFuncs->vkCmdDraw(commandBuffer, 4, 1, 0, 0);
+    _vkManager->vkCmdDraw(commandBuffer, 4, 1, 0, 0);
 }
 
 void VulkanRenderNode::releaseResources()
 {
-    if (m_device == VK_NULL_HANDLE || !m_devFuncs)
-        return;
+    // if (_vkManager->device() == VK_NULL_HANDLE || !m_devFuncs)
+        // return;
 
     if (m_graphicsTrianglePipeline != VK_NULL_HANDLE) {
-        m_devFuncs->vkDestroyPipeline(m_device, m_graphicsTrianglePipeline, nullptr);
+        _vkManager->vkDestroyPipeline(m_graphicsTrianglePipeline, nullptr);
         m_graphicsTrianglePipeline = VK_NULL_HANDLE;
     }
 
     if (m_pipelineTriangleLayout != VK_NULL_HANDLE) {
-        m_devFuncs->vkDestroyPipelineLayout(m_device, m_pipelineTriangleLayout, nullptr);
+        _vkManager->vkDestroyPipelineLayout(m_pipelineTriangleLayout, nullptr);
         m_pipelineTriangleLayout = VK_NULL_HANDLE;
     }
 
     if (m_graphicsLinePipeline != VK_NULL_HANDLE) {
-        m_devFuncs->vkDestroyPipeline(m_device, m_graphicsLinePipeline, nullptr);
+        _vkManager->vkDestroyPipeline(m_graphicsLinePipeline, nullptr);
         m_graphicsLinePipeline = VK_NULL_HANDLE;
     }
 
     if (m_pipelineLineLayout != VK_NULL_HANDLE) {
-        m_devFuncs->vkDestroyPipelineLayout(m_device, m_pipelineLineLayout, nullptr);
+        _vkManager->vkDestroyPipelineLayout(m_pipelineLineLayout, nullptr);
         m_pipelineLineLayout = VK_NULL_HANDLE;
     }
 
-    if (m_vertShaderModule != VK_NULL_HANDLE) {
-        m_devFuncs->vkDestroyShaderModule(m_device, m_vertShaderModule, nullptr);
-        m_vertShaderModule = VK_NULL_HANDLE;
-    }
+    // if (m_vertShaderModule != VK_NULL_HANDLE) {
+    //     _vkManager->devFuncs()->vkDestroyShaderModule(_vkManager->device(), m_vertShaderModule, nullptr);
+    //     m_vertShaderModule = VK_NULL_HANDLE;
+    // }
 
-    if (m_fragShaderModule != VK_NULL_HANDLE) {
-        m_devFuncs->vkDestroyShaderModule(m_device, m_fragShaderModule, nullptr);
-        m_fragShaderModule = VK_NULL_HANDLE;
-    }
+    // if (m_fragShaderModule != VK_NULL_HANDLE) {
+    //     _vkManager->devFuncs()->vkDestroyShaderModule(_vkManager->device(), m_fragShaderModule, nullptr);
+    //     m_fragShaderModule = VK_NULL_HANDLE;
+    // }
 
-    if (m_fragDashShaderModule != VK_NULL_HANDLE) {
-        m_devFuncs->vkDestroyShaderModule(m_device, m_fragDashShaderModule, nullptr);
-        m_fragDashShaderModule = VK_NULL_HANDLE;
-    }
+    // if (m_fragDashShaderModule != VK_NULL_HANDLE) {
+    //     _vkManager->devFuncs()->vkDestroyShaderModule(_vkManager->device(), m_fragDashShaderModule, nullptr);
+    //     m_fragDashShaderModule = VK_NULL_HANDLE;
+    // }
 
-    if (m_vertCircleModule != VK_NULL_HANDLE) {
-        m_devFuncs->vkDestroyShaderModule(m_device, m_vertCircleModule, nullptr);
-    }
+    // if (m_vertCircleModule != VK_NULL_HANDLE) {
+    //     _vkManager->devFuncs()->vkDestroyShaderModule(_vkManager->device(), m_vertCircleModule, nullptr);
+    // }
 
-    if (m_fragCircleModule != VK_NULL_HANDLE) {
-        m_devFuncs->vkDestroyShaderModule(m_device, m_fragCircleModule, nullptr);
-    }
+    // if (m_fragCircleModule != VK_NULL_HANDLE) {
+    //     _vkManager->devFuncs()->vkDestroyShaderModule(_vkManager->device(), m_fragCircleModule, nullptr);
+    // }
 
-    if (m_vertexTriangleBuffer != VK_NULL_HANDLE) {
-        m_devFuncs->vkDestroyBuffer(m_device, m_vertexTriangleBuffer, nullptr);
-        m_vertexTriangleBuffer = VK_NULL_HANDLE;
-    }
+    // if (m_vertexTriangleBuffer != VK_NULL_HANDLE) {
+    //     _vkManager->devFuncs()->vkDestroyBuffer(_vkManager->device(), m_vertexTriangleBuffer, nullptr);
+    //     m_vertexTriangleBuffer = VK_NULL_HANDLE;
+    // }
 
-    if (m_vertexTriangleBufferMemory != VK_NULL_HANDLE) {
-        m_devFuncs->vkFreeMemory(m_device, m_vertexTriangleBufferMemory, nullptr);
-        m_vertexTriangleBufferMemory = VK_NULL_HANDLE;
-    }
+    // if (m_vertexTriangleBufferMemory != VK_NULL_HANDLE) {
+    //     _vkManager->devFuncs()->vkFreeMemory(_vkManager->device(), m_vertexTriangleBufferMemory, nullptr);
+    //     m_vertexTriangleBufferMemory = VK_NULL_HANDLE;
+    // }
 
-    if (m_vertexLineBuffer != VK_NULL_HANDLE) {
-        m_devFuncs->vkDestroyBuffer(m_device, m_vertexLineBuffer, nullptr);
-        m_vertexLineBuffer = VK_NULL_HANDLE;
-    }
+    // if (m_vertexLineBuffer != VK_NULL_HANDLE) {
+    //     _vkManager->devFuncs()->vkDestroyBuffer(_vkManager->device(), m_vertexLineBuffer, nullptr);
+    //     m_vertexLineBuffer = VK_NULL_HANDLE;
+    // }
 
-    if (m_vertexLineBufferMemory != VK_NULL_HANDLE) {
-        m_devFuncs->vkFreeMemory(m_device, m_vertexLineBufferMemory, nullptr);
-        m_vertexLineBufferMemory = VK_NULL_HANDLE;
-    }
+    // if (m_vertexLineBufferMemory != VK_NULL_HANDLE) {
+    //     _vkManager->devFuncs()->vkFreeMemory(_vkManager->device(), m_vertexLineBufferMemory, nullptr);
+    //     m_vertexLineBufferMemory = VK_NULL_HANDLE;
+    // }
 
-    if (m_vertexNetBuffer != VK_NULL_HANDLE) {
-        m_devFuncs->vkDestroyBuffer(m_device, m_vertexNetBuffer, nullptr);
-        m_vertexNetBuffer = VK_NULL_HANDLE;
-    }
+    // if (m_vertexNetBuffer != VK_NULL_HANDLE) {
+    //     _vkManager->devFuncs()->vkDestroyBuffer(_vkManager->device(), m_vertexNetBuffer, nullptr);
+    //     m_vertexNetBuffer = VK_NULL_HANDLE;
+    // }
 
-    if (m_vertexNetBufferMemory != VK_NULL_HANDLE) {
-        m_devFuncs->vkFreeMemory(m_device, m_vertexNetBufferMemory, nullptr);
-        m_vertexNetBufferMemory = VK_NULL_HANDLE;
-    }
+    // if (m_vertexNetBufferMemory != VK_NULL_HANDLE) {
+    //     _vkManager->devFuncs()->vkFreeMemory(_vkManager->device(), m_vertexNetBufferMemory, nullptr);
+    //     m_vertexNetBufferMemory = VK_NULL_HANDLE;
+    // }
 
-    if (m_vertexAddedLinesBuffer != VK_NULL_HANDLE) {
-        m_devFuncs->vkDestroyBuffer(m_device, m_vertexAddedLinesBuffer, nullptr);
-        m_vertexAddedLinesBuffer = VK_NULL_HANDLE;
-    }
+    // if (m_vertexAddedLinesBuffer != VK_NULL_HANDLE) {
+    //     _vkManager->devFuncs()->vkDestroyBuffer(_vkManager->device(), m_vertexAddedLinesBuffer, nullptr);
+    //     m_vertexAddedLinesBuffer = VK_NULL_HANDLE;
+    // }
 
-    if (m_vertexAddedLinesBufferMemory != VK_NULL_HANDLE) {
-        m_devFuncs->vkFreeMemory(m_device, m_vertexAddedLinesBufferMemory, nullptr);
-        m_vertexAddedLinesBufferMemory = VK_NULL_HANDLE;
-    }
+    // if (m_vertexAddedLinesBufferMemory != VK_NULL_HANDLE) {
+    //     _vkManager->devFuncs()->vkFreeMemory(_vkManager->device(), m_vertexAddedLinesBufferMemory, nullptr);
+    //     m_vertexAddedLinesBufferMemory = VK_NULL_HANDLE;
+    // }
 
     if (m_commandBuffer != VK_NULL_HANDLE && m_commandPool != VK_NULL_HANDLE) {
-        m_devFuncs->vkFreeCommandBuffers(m_device, m_commandPool, 1, &m_commandBuffer);
+        _vkManager->vkFreeCommandBuffers(m_commandPool, 1, &m_commandBuffer);
         m_commandBuffer = VK_NULL_HANDLE;
     }
     
     if (m_commandPool != VK_NULL_HANDLE) {
-        m_devFuncs->vkDestroyCommandPool(m_device, m_commandPool, nullptr);
+        _vkManager->vkDestroyCommandPool(m_commandPool, nullptr);
         m_commandPool = VK_NULL_HANDLE;
     }
 

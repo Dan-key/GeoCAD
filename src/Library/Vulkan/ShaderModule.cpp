@@ -21,4 +21,24 @@ ShaderModule::ShaderModule(std::shared_ptr<VulkanManager>& vkManager, const std:
     _module = vkManager->createShaderModule(spirv);
 }
 
+ShaderModule::ShaderModule(std::shared_ptr<VulkanManager>& vkManager) :
+    VulkanComponent(vkManager)
+{
+
 }
+
+void ShaderModule::setShader(const SpirvByteCode& spirv)
+{
+    _module = _vkManager->createShaderModule(spirv);
+}
+
+
+ShaderModule::~ShaderModule()
+{
+    if (_module != VK_NULL_HANDLE) {
+        _vkManager->vkDestroyShaderModule(_module, nullptr);
+        _module = VK_NULL_HANDLE;
+    }
+}
+
+} //namespace Vulkan

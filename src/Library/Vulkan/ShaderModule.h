@@ -15,11 +15,17 @@ public:
     ShaderModule(std::shared_ptr<VulkanManager>& vkManager, const std::string& fileName);
     ShaderModule(std::shared_ptr<VulkanManager>& vkManager, const SpirvByteCode&);
 
-    operator VkShaderModule();
+    ~ShaderModule();
+
+    void setShader(const SpirvByteCode& spirv);
+
+    ShaderModule(std::shared_ptr<VulkanManager>& vkManager);
+
+    operator VkShaderModule() { return _module; };
     VkShaderModule get();
 
 protected:
-    VkShaderModule _module;
+    VkShaderModule _module = VK_NULL_HANDLE;
 };
 
 }
