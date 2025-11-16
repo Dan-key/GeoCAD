@@ -64,4 +64,5 @@ private:
     bool isSecondPoint = false;
 public slots:
     void addingLine();
+    void addingLineWithCoordinates(float x1, float y1, float x2, float y2);
 };

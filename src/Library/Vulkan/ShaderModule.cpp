@@ -32,7 +32,6 @@ void ShaderModule::setShader(const SpirvByteCode& spirv)
     _module = _vkManager->createShaderModule(spirv);
 }
 
-
 ShaderModule::~ShaderModule()
 {
     if (_module != VK_NULL_HANDLE) {

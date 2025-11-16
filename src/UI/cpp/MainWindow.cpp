@@ -13,3 +13,9 @@ void MainWindow::addLine()
         emit lineSignal();
     }
 }
+
+void MainWindow::addLineWithCoordinates()
+{
+    // Just emit the signal for now; the actual line addition will be handled elsewhere
+    emit lineSignal();
+}

@@ -32,11 +32,32 @@ ApplicationWindow {
                         vulkanItem.addingLine();
                     }
                 }
+                GeoDoubleBoxWithLable {
+                    model: mainWindow
+                    modelName: "x1"
+                    labelText: "X1"
+                }
+                GeoDoubleBoxWithLable {
+                    model: mainWindow
+                    modelName: "y1"
+                    labelText: "Y1"
+                }
+                GeoDoubleBoxWithLable {
+                    model: mainWindow
+                    modelName: "x2"
+                    labelText: "X2"
+                }
+                GeoDoubleBoxWithLable {
+                    model: mainWindow
+                    modelName: "y2"
+                    labelText: "Y2"
+                }
                 GeoButton {
                     text: "addLine"
                     onClicked: {
-                        mainWindow.addLine();
-                        vulkanItem.addingLine();
+                        vulkanItem.addingLineWithCoordinates(mainWindow.x1, mainWindow.y1, mainWindow.x2, mainWindow.y2);
+                        mainWindow.addLineWithCoordinates();
+                        console.log(mainWindow.y1);
                     }
                 }
                 GeoButton {

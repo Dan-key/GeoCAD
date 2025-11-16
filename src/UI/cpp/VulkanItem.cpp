@@ -190,3 +190,17 @@ void VulkanItem::addingLine()
     isLineAdding = true;
     qDebug() << "get line signal";
 }
+
+void VulkanItem::addingLineWithCoordinates(float x1, float y1, float x2, float y2)
+{
+    isLineAdding = false;
+    qDebug() << "get line with coordinates signal";
+
+    Geometry::Line line = {
+        Geometry::Vertex{(float)x1, (float)y1, 0., 0., 0.}, 
+        Geometry::Vertex{(float)x2, (float)y2, 0., 0., 0.}
+    };
+    if (m_renderNode) {
+        m_renderNode->addLine(line);
+    }
+}
