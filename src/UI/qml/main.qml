@@ -28,8 +28,7 @@ ApplicationWindow {
                 GeoButton {
                     text: "addLine"
                     onClicked: {
-                        mainWindow.addLine();
-                        vulkanItem.addingLine();
+                        mainWindow.addLineMode();
                     }
                 }
                 GeoDoubleBoxWithLable {
@@ -60,6 +59,11 @@ ApplicationWindow {
                         console.log(mainWindow.y1);
                     }
                 }
+                GeoDoubleBoxWithLable {
+                    model: mainWindow
+                    modelName: "angle"
+                    labelText: "Angle"
+                }
                 GeoButton {
                     text: "addLine"
                     onClicked: {
@@ -74,6 +78,7 @@ ApplicationWindow {
             id: vulkanItem
             Layout.fillWidth: true
             Layout.fillHeight: true
+            controller: mainWindow
             Rectangle {
                 anchors.fill: parent
                 color: '#9db0c4'

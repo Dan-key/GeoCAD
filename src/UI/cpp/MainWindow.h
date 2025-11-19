@@ -2,8 +2,22 @@
 
 #include <iostream>
 #include <QObject>
+#include <QSizeF>
+#include <QMouseEvent>
+#include <QHoverEvent>
+#include <QWheelEvent>
+#include <QKeyEvent>
+#include "Library/Flux/MutableList.h"
+#include "ModeHandlers/ViewportContext.h"
+#include <linux/limits.h>
+#include <memory>
 
 #include "Library/Meta/Meta.h"
+#include "Geometry/Line.h"
+
+namespace ModeHandlers {
+    class IModeHandler;
+}
 
 class MainWindow : public QObject
 {
@@ -21,10 +35,37 @@ public:
     EXPOSE(x2);
     EXPOSE(y2);
 
-public slots:
-    void addLine();
-    void addLineWithCoordinates();
-signals:
-    void lineSignal();
+    float angle = 0.0;
+    EXPOSE(angle);
 
+    enum class Mode {
+        None,
+        AddLine,
+    };
+
+    Mode currentMode = Mode::None;
+
+    void changeMode(Mode newMode);
+    QSizeF vulkanItemSize();
+
+    void addLine(const Geometry::Line& line);
+    void updateLine(const Geometry::Line& line);
+    void updatePosition(const QPointF& position);
+
+    Flux::MutableList<Geometry::Line> lines;
+
+public slots:
+    void mousePress(QMouseEvent* event, ViewportContext cntx);
+    void mouseMove(QMouseEvent* event, ViewportContext cntx);
+    void mouseRelease(QMouseEvent* event, ViewportContext cntx);
+    void hoverEnter(QHoverEvent* event, ViewportContext cntx);
+    void hoverMove(QHoverEvent* event, ViewportContext cntx);
+    void hoverLeave(QHoverEvent* event, ViewportContext cntx);
+    void wheel(QWheelEvent* event, ViewportContext cntx);
+    void keyPress(QKeyEvent* event, ViewportContext cntx);
+
+    void addLineMode();
+
+private:
+    std::shared_ptr<ModeHandlers::IModeHandler> _modeController;
 };

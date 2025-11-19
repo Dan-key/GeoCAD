@@ -1,3 +1,4 @@
+#include <cstddef>
 #include <exception>
 #include <memory>
 #include <qlogging.h>
@@ -12,6 +13,8 @@
 #include "VulkanRenderNode.h"
 #include "Library/Files/FileStream.h"
 #include "Library/Vulkan/VulkanManager.h"
+#include "UI/cpp/Geometry/Line.h"
+#include "UI/cpp/MainWindow.h"
 
 namespace {
 
@@ -38,7 +41,7 @@ std::string queueFamiliesFlagsToString(VkQueueFlags flags)
 float VulkanRenderNode::z = 1.0f;
 QPointF VulkanRenderNode::pos = {0, 0};
 
-VulkanRenderNode::VulkanRenderNode(QQuickItem *item) :
+VulkanRenderNode::VulkanRenderNode(QQuickItem *item, MainWindow* controller) :
     _vkManager(std::make_shared<Vulkan::VulkanManager>(item)),
     bufferTriangle(_vkManager),
     bufferLine(_vkManager),
@@ -48,7 +51,8 @@ VulkanRenderNode::VulkanRenderNode(QQuickItem *item) :
     m_fragShaderModule(_vkManager),
     m_fragDashShaderModule(_vkManager),
     m_vertCircleModule(_vkManager),
-    m_fragCircleModule(_vkManager)
+    m_fragCircleModule(_vkManager),
+    m_verticesAddedLines()
 {
     Files::FileStream vertFS("shaders/vertex.spv");
     Files::FileStream fragFS("shaders/frag.spv");
@@ -63,6 +67,7 @@ VulkanRenderNode::VulkanRenderNode(QQuickItem *item) :
     fragCircleShaderCode = fragCircleFS.getSpirvByteCode();
 
     initVulkan(item);
+    connectController(controller);
 }
 
 VulkanRenderNode::~VulkanRenderNode()
@@ -221,18 +226,6 @@ void VulkanRenderNode::createBuffer()
                         m_verticesNet.size() * sizeof(decltype(m_verticesNet)::value_type));
 
     bufferAddedLines.allocateMemory(1000 * sizeof(decltype(m_verticesAddedLines)::value_type));
-}
-
-void VulkanRenderNode::addLine(const Geometry::Line& line)
-{
-    m_verticesAddedLines.push_back(line);
-    updateVertexAddedLinesBuffer();
-}
-
-void VulkanRenderNode::updateLine(const Geometry::Line& line)
-{
-    m_verticesAddedLines[m_verticesAddedLines.size() -1] = line;
-    updateVertexAddedLinesBuffer();
 }
 
 void VulkanRenderNode::createShaderModules()
@@ -923,7 +916,7 @@ void VulkanRenderNode::updateVertexBuffer()
     bufferTriangle.updateMemory(0, m_verticesTriangle.data(), m_verticesTriangle.size() * sizeof(decltype(m_verticesTriangle)::value_type));
 }
 
-void VulkanRenderNode::updateVertexAddedLinesBuffer()
+void VulkanRenderNode::updateVertexAddedLinesBuffer(const Geometry::Line& line, size_t index)
 {
     // if (m_vertexAddedLinesBuffer == VK_NULL_HANDLE)
     //     return;
@@ -937,8 +930,9 @@ void VulkanRenderNode::updateVertexAddedLinesBuffer()
     //     _vkManager->devFuncs()->vkUnmapMemory(_vkManager->device(), m_vertexAddedLinesBufferMemory);
     //     m_verticesAddedLinesDirty = false;
     // }
-
-    bufferAddedLines.updateMemory((m_verticesAddedLines.size() - 1) * sizeof(decltype(m_verticesAddedLines)::value_type), &m_verticesAddedLines[m_verticesAddedLines.size()-1], sizeof(decltype(m_verticesAddedLines)::value_type));
+    decltype(m_verticesAddedLines)::value_type* data = new decltype(m_verticesAddedLines)::value_type;
+    *data = m_verticesAddedLines.at(index);
+    bufferAddedLines.updateMemory(index * sizeof(decltype(m_verticesAddedLines)::value_type), data, sizeof(decltype(m_verticesAddedLines)::value_type));
     m_verticesAddedLinesDirty = false;
 }
 
@@ -959,12 +953,10 @@ void VulkanRenderNode::updateVertexPosition(const QPointF& position)
     updateVertexBuffer();
 }
 
-
 void VulkanRenderNode::render(const RenderState *state)
 {
     if (!m_initialized || m_commandBuffer == VK_NULL_HANDLE)
         return;
-
 
     VkRenderPass currentRenderPass = *_vkManager->getResource<VkRenderPass>(QSGRendererInterface::RenderPassResource);
 
@@ -1063,7 +1055,6 @@ void VulkanRenderNode::drawTriangle(VkCommandBuffer commandBuffer)
 
     // Draw - this is now valid because we're in Qt's render pass
     _vkManager->vkCmdDraw(commandBuffer, 3, 1, 0, 0);
-
 }
 
 void VulkanRenderNode::drawNet(VkCommandBuffer commandBuffer)
@@ -1175,7 +1166,6 @@ void VulkanRenderNode::drawAddedLines(VkCommandBuffer commandBuffer)
     _vkManager->vkCmdBindVertexBuffers(commandBuffer, 0, 1, vertexBuffers, offsets);
 
     _vkManager->vkCmdDraw(commandBuffer, m_verticesAddedLines.size() * 2, 1, 0, 0);
-
 }
 
 void VulkanRenderNode::drawLine(VkCommandBuffer commandBuffer)
@@ -1337,4 +1327,12 @@ QSGRenderNode::StateFlags VulkanRenderNode::changedStates() const
 QSGRenderNode::RenderingFlags VulkanRenderNode::flags() const
 {
     return BoundedRectRendering | DepthAwareRendering;
+}
+
+void VulkanRenderNode::connectController(MainWindow* controller)
+{
+    m_verticesAddedLines = controller->lines;
+    m_verticesAddedLines.subscribe([this](const Geometry::Line& line, size_t index) {
+        updateVertexAddedLinesBuffer(line, index);
+    });
 }

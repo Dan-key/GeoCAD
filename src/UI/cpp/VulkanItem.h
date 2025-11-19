@@ -8,6 +8,8 @@
 #include <qevent.h>
 #include <qpoint.h>
 
+#include "UI/cpp/MainWindow.h"
+#include "UI/cpp/ModeHandlers/ViewportContext.h"
 #include "VulkanRenderNode.h"
 
 
@@ -16,9 +18,9 @@ class VulkanItem : public QQuickItem
     Q_OBJECT
     QML_ELEMENT
 
-    // Add properties for mouse interaction
     // Q_PROPERTY(bool interactive READ interactive WRITE setInteractive NOTIFY interactiveChanged)
     // Q_PROPERTY(QColor triangleColor READ triangleColor WRITE setTriangleColor NOTIFY triangleColorChanged)
+    Q_PROPERTY(QObject* controller READ controller WRITE setController NOTIFY controllerChanged)
 
 public:
     VulkanItem(QQuickItem *parent = nullptr);
@@ -29,6 +31,9 @@ public:
     // QColor triangleColor() const { return m_triangleColor; }
     // void setTriangleColor(const QColor& color);
     static float z;
+
+    QObject* controller() const { return _controller; }
+    void setController(QObject* controller);
 
 protected:
     QSGNode *updatePaintNode(QSGNode *oldNode, UpdatePaintNodeData *) override;
@@ -45,17 +50,23 @@ protected:
 
 signals:
     void interactiveChanged();
-    void triangleColorChanged();
-    void mousePressed(qreal x, qreal y);
-    void mouseMoved(qreal x, qreal y);
-    void mouseReleased(qreal x, qreal y);
-    void hoverPositionChanged(qreal x, qreal y);
+    void mousePress(QMouseEvent* event, ViewportContext cntx);
+    void mouseMove(QMouseEvent* event, ViewportContext cntx);
+    void mouseRelease(QMouseEvent* event, ViewportContext cntx);
+    void hoverEnter(QHoverEvent* event, ViewportContext cntx);
+    void hoverMove(QHoverEvent* event, ViewportContext cntx);
+    void hoverLeave(QHoverEvent* event, ViewportContext cntx);
+    void wheel(QWheelEvent* event, ViewportContext cntx);
+    void keyPress(QKeyEvent* event, ViewportContext cntx);
+    void controllerChanged();
 
 private:
     VulkanRenderNode *m_renderNode = nullptr;
+
     // bool m_interactive = true;
     // QColor m_triangleColor = Qt::red;
     bool m_mousePressed = false;
+    MainWindow *_controller = nullptr;
     QPointF deltaPos;
     QPointF beginPos;
     bool isLineAdding = false;
@@ -63,6 +74,9 @@ private:
     QPointF addLineStart;
     bool isSecondPoint = false;
 public slots:
-    void addingLine();
-    void addingLineWithCoordinates(float x1, float y1, float x2, float y2);
+    // void addLine(const Geometry::Line& line);
+    // void updateLine(const Geometry::Line& line);
+    // void addingLineWithCoordinates(float x1, float y1, float x2, float y2);
+private:
+    void connectController(MainWindow* controller);
 };

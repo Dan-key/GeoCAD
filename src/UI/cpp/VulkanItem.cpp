@@ -11,119 +11,44 @@
 #include <QTimer>
 
 #include "Geometry/Vertex.h"
+#include "UI/cpp/MainWindow.h"
 #include "VulkanRenderNode.h"
 
 void VulkanItem::mousePressEvent(QMouseEvent *event)
 {
-    m_mousePressed = true;
-    QPointF localPos = event->position();
-
-    qDebug() << "Mouse pressed at:" << localPos << "buttons" << event->buttons();
-    emit mousePressed(localPos.x(), localPos.y());
-    if (isLineAdding) {
-        if (event->buttons() & Qt::RightButton) {
-            isLineAdding = false;
-            isSecondPoint = false;
-            QGuiApplication::restoreOverrideCursor();
-            event->accept();
-            return;
-        }
-        if (!isSecondPoint) {
-            auto itemSize = size();
-
-            addLineStart = QPointF(
-                (((event->position().x() - VulkanRenderNode::pos.x() / 2) * 2 / (itemSize.width()) - 1) / VulkanRenderNode::z),
-                (((event->position().y() - VulkanRenderNode::pos.y() / 2) * 2 / (itemSize.height()) - 1) / VulkanRenderNode::z)
-            );
-            qDebug() << "addLineStart" << addLineStart << "eventposition" << event->position();
-            // isSecondPoint = true;
-            return;
-        }
-    }
-    if (m_renderNode && event->buttons() & Qt::LeftButton) {
-        m_renderNode->updateVertexPosition(localPos);
-        update();
-    } else if (m_renderNode && (event->buttons() & Qt::MiddleButton || event->buttons() & Qt::RightButton)) {
-        beginPos = event->position();
-        deltaPos = VulkanRenderNode::pos;
-    }
-
+    emit mousePress(event, ViewportContext{VulkanRenderNode::z, VulkanRenderNode::pos, size()});
     event->accept();
 }
 
 void VulkanItem::mouseMoveEvent(QMouseEvent *event)
 {
-    QPointF localPos = event->position();
-
-    if (isLineAdding) {
-        auto itemSize = size();
-
-        float endXpos = ((localPos.x() - VulkanRenderNode::pos.x() / 2) * 2 / itemSize.width() - 1) / VulkanRenderNode::z;
-        float endYpos = ((localPos.y() - VulkanRenderNode::pos.y() / 2) * 2 / itemSize.height() - 1) / VulkanRenderNode::z;
-        Geometry::Line line = {
-            Geometry::Vertex{(float)addLineStart.x(), (float)addLineStart.y(), 0., 0., 0.}, 
-            Geometry::Vertex{endXpos, endYpos, 0., 0., 0.}
-        };
-        if (isSecondPoint) {
-            m_renderNode->updateLine(line);
-        } else {
-            isSecondPoint = true;
-            m_renderNode->addLine(line);
-        }
-    }
-    if (m_mousePressed && m_renderNode && event->buttons() & Qt::LeftButton) {
-        m_renderNode->updateVertexPosition(localPos);
-        update();
-    } else if (m_mousePressed && m_renderNode && (event->buttons() & Qt::MiddleButton || event->buttons() & Qt::RightButton)) {
-        auto delta = event->position() - beginPos;
-        VulkanRenderNode::pos = deltaPos + delta;
-    }
-
-    emit mouseMoved(localPos.x(), localPos.y());
+    emit mouseMove(event, ViewportContext{VulkanRenderNode::z, VulkanRenderNode::pos, size()});
     event->accept();
 }
 
 void VulkanItem::mouseReleaseEvent(QMouseEvent *event)
 {
-    m_mousePressed = false;
-    QPointF localPos = event->position();
-
-    qDebug() << "Mouse released at:" << localPos;
-    emit mouseReleased(localPos.x(), localPos.y());
-    beginPos = {0.0, 0.0};
-    deltaPos = {0.0, 0.0};
-    
-    if (isLineAdding) {
-        if (isSecondPoint) {
-        auto itemSize = size();
-
-        float endXpos = ((event->position().x() - VulkanRenderNode::pos.x() / 2) * 2 / itemSize.width() - 1) / VulkanRenderNode::z;
-        float endYpos = ((event->position().y() - VulkanRenderNode::pos.y() / 2) * 2 / itemSize.height() - 1) / VulkanRenderNode::z;
-
-        qDebug() << "endLineStart" << QPointF{endXpos, endXpos} << "eventposition" << event->position();
-
-        Geometry::Line line = {
-            Geometry::Vertex{(float)addLineStart.x(), (float)(addLineStart.y()),0.0, 0.0, 0.0},
-            Geometry::Vertex{endXpos, endYpos, 0.0, 0.0, 0.0}};
-        m_renderNode->addLine(line);
-        isSecondPoint = false;
-        isLineAdding = false;
-        QGuiApplication::restoreOverrideCursor();
-        event->accept();
-        return;
-        } else {
-            isSecondPoint = true;
-        }
-    }
-
+    emit mouseRelease(event, ViewportContext{VulkanRenderNode::z, VulkanRenderNode::pos, size()});
     event->accept();
 }
 
 void VulkanItem::hoverEnterEvent(QHoverEvent *event)
 {
-    QPointF localPos = event->position();
-    emit hoverPositionChanged(localPos.x(), localPos.y());
+    emit hoverEnter(event, ViewportContext{VulkanRenderNode::z, VulkanRenderNode::pos, size()});
     event->accept();
+}
+
+void VulkanItem::setController(QObject* controller)
+{
+    if (_controller == controller)
+        return;
+
+    _controller = static_cast<MainWindow*>(controller);
+    emit controllerChanged();
+
+    if (_controller) {
+        connectController(_controller);
+    }
 }
 
 void VulkanItem::keyPressEvent(QKeyEvent* event)
@@ -133,20 +58,19 @@ void VulkanItem::keyPressEvent(QKeyEvent* event)
         isLineAdding = false;
         QGuiApplication::restoreOverrideCursor();
     }
+    emit keyPress(event, ViewportContext{VulkanRenderNode::z, VulkanRenderNode::pos, size()});
     event->accept();
 }
 
 void VulkanItem::hoverMoveEvent(QHoverEvent *event)
 {
-    QPointF localPos = event->position();
-    // qDebug() << "hover" << localPos;
-    emit hoverPositionChanged(localPos.x(), localPos.y());
+    emit hoverMove(event, ViewportContext{VulkanRenderNode::z, VulkanRenderNode::pos, size()});
     event->accept();
 }
 
 void VulkanItem::hoverLeaveEvent(QHoverEvent *event)
 {
-    emit hoverPositionChanged(-1, -1); // Signal that hover left
+    emit hoverLeave(event, ViewportContext{VulkanRenderNode::z, VulkanRenderNode::pos, size()});
     event->accept();
 }
 
@@ -159,6 +83,7 @@ void VulkanItem::wheelEvent(QWheelEvent* event)
         VulkanRenderNode::z *= 0.9;
     }
     qDebug() << "VulkanItem::z" << VulkanRenderNode::z;
+    emit wheel(event, ViewportContext{VulkanRenderNode::z, VulkanRenderNode::pos, size()});
     event->accept();
 }
 
@@ -178,29 +103,43 @@ QSGNode* VulkanItem::updatePaintNode(QSGNode *oldNode, UpdatePaintNodeData *)
 {
     VulkanRenderNode *node = static_cast<VulkanRenderNode *>(oldNode);
     if (!node)
-        node = new VulkanRenderNode(this);
+        node = new VulkanRenderNode(this, _controller);
     m_renderNode = node;
     node->markDirty(QSGNode::DirtyMaterial);
 
     return node;
 }
 
-void VulkanItem::addingLine()
-{
-    isLineAdding = true;
-    qDebug() << "get line signal";
-}
+// void VulkanItem::addingLine()
+// {
+//     isLineAdding = true;
+//     qDebug() << "get line signal";
+// }
 
-void VulkanItem::addingLineWithCoordinates(float x1, float y1, float x2, float y2)
-{
-    isLineAdding = false;
-    qDebug() << "get line with coordinates signal";
+// void VulkanItem::addingLineWithCoordinates(float x1, float y1, float x2, float y2)
+// {
+//     // isLineAdding = false;
+//     // qDebug() << "get line with coordinates signal";
 
-    Geometry::Line line = {
-        Geometry::Vertex{(float)x1, (float)y1, 0., 0., 0.}, 
-        Geometry::Vertex{(float)x2, (float)y2, 0., 0., 0.}
-    };
-    if (m_renderNode) {
-        m_renderNode->addLine(line);
-    }
+//     // Geometry::Line line = {
+//     //     Geometry::Vertex{(float)x1, (float)y1, 0., 0., 0.}, 
+//     //     Geometry::Vertex{(float)x2, (float)y2, 0., 0., 0.}
+//     // };
+//     // if (m_renderNode) {
+//     //     m_renderNode->addLine(line);
+//     // }
+// }
+
+void VulkanItem::connectController(MainWindow* controller)
+{
+    qRegisterMetaType<ViewportContext>("ViewportContext");
+
+    QObject::connect(this, &VulkanItem::mousePress, controller, &MainWindow::mousePress);
+    QObject::connect(this, &VulkanItem::mouseMove, controller, &MainWindow::mouseMove);
+    QObject::connect(this, &VulkanItem::mouseRelease, controller, &MainWindow::mouseRelease);
+    QObject::connect(this, &VulkanItem::hoverEnter, controller, &MainWindow::hoverEnter);
+    QObject::connect(this, &VulkanItem::hoverMove, controller, &MainWindow::hoverMove);
+    QObject::connect(this, &VulkanItem::hoverLeave, controller, &MainWindow::hoverLeave);
+    QObject::connect(this, &VulkanItem::wheel, controller, &MainWindow::wheel);
+    QObject::connect(this, &VulkanItem::keyPress, controller, &MainWindow::keyPress);
 }

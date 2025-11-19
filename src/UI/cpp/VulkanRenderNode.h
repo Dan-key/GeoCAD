@@ -8,15 +8,18 @@
 #include <memory>
 
 #include "Geometry/Line.h"
+#include "Library/Flux/MutableList.h"
+#include "Library/Flux/Mutable.h"
 #include "Library/Vulkan/Buffer.h"
 #include "Library/Vulkan/ShaderModule.h"
 #include "Library/Vulkan/SpirvByteCode.h"
 #include "Library/Vulkan/VulkanManager.h"
+#include "UI/cpp/MainWindow.h"
 
 class VulkanRenderNode : public QSGRenderNode
 {
 public:
-    VulkanRenderNode(QQuickItem *item);
+    VulkanRenderNode(QQuickItem *item, MainWindow* controller);
     ~VulkanRenderNode();
 
     void render(const RenderState *state) override;
@@ -25,8 +28,8 @@ public:
     RenderingFlags flags() const override;
 
     void updateVertexPosition(const QPointF& position);
-    void addLine(const Geometry::Line& line);
-    void updateLine(const Geometry::Line& line);
+
+    void connectController(MainWindow* controller);
 
     static float z;
     static QPointF pos;
@@ -49,7 +52,7 @@ private:
 
     void recordCommandBuffer(const RenderState *state);
     void updateVertexBuffer();
-    void updateVertexAddedLinesBuffer();
+    void updateVertexAddedLinesBuffer(const Geometry::Line& line, size_t index);
 
     void drawTriangle(VkCommandBuffer);
     void drawLine(VkCommandBuffer);
@@ -108,7 +111,7 @@ private:
     std::vector<Geometry::Vertex> m_verticesTriangle;
     std::vector<Geometry::Vertex> m_verticesLine;
     std::vector<Geometry::Vertex> m_verticesNet;
-    std::vector<Geometry::Line> m_verticesAddedLines;
+    Flux::MutableList<Geometry::Line> m_verticesAddedLines;
 
     QRectF _viewPort {};
 
