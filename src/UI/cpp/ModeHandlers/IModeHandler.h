@@ -18,12 +18,15 @@ public:
     IModeHandler(MainWindow* controller) : _controller(controller) {};
     virtual void mousePressEvent(QMouseEvent *event, ViewportContext cntx)
     {
-        if ((event->buttons() & Qt::MiddleButton || event->buttons() & Qt::RightButton)) {
+        auto modifiers = QGuiApplication::queryKeyboardModifiers();
+
+        if ((event->buttons() & Qt::MiddleButton || (event->buttons() & Qt::RightButton && modifiers & Qt::ControlModifier))) {
             m_mousePressed = true;
             beginPos = event->position();
             deltaPos = VulkanRenderNode::pos;
         }
     };
+
     virtual void mouseMoveEvent(QMouseEvent *event, ViewportContext cntx)
     {
         if (m_mousePressed && (event->buttons() & Qt::MiddleButton || event->buttons() & Qt::RightButton)) {
@@ -31,6 +34,7 @@ public:
             _controller->updatePosition(deltaPos + delta);
         }
     };
+
     virtual void mouseReleaseEvent(QMouseEvent *event, ViewportContext cntx)
     {
         m_mousePressed = false;
