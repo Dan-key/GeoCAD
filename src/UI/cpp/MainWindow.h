@@ -65,6 +65,7 @@ public slots:
     void keyPress(QKeyEvent* event, ViewportContext cntx);
 
     void addLineMode();
+    void addingLineWithCoordinates(float x1, float y1, float x2, float y2);
 
 private:
     std::shared_ptr<ModeHandlers::IModeHandler> _modeController;

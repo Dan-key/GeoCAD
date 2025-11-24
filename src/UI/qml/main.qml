@@ -54,9 +54,7 @@ ApplicationWindow {
                 GeoButton {
                     text: "addLine"
                     onClicked: {
-                        vulkanItem.addingLineWithCoordinates(mainWindow.x1, mainWindow.y1, mainWindow.x2, mainWindow.y2);
-                        mainWindow.addLineWithCoordinates();
-                        console.log(mainWindow.y1);
+                        mainWindow.addingLineWithCoordinates(mainWindow.x1, mainWindow.y1, mainWindow.x2, mainWindow.y2);
                     }
                 }
                 GeoDoubleBoxWithLable {

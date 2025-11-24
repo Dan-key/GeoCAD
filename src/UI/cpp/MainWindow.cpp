@@ -2,6 +2,7 @@
 #include <QCursor>
 #include <QGuiApplication>
 #include <memory>
+#include "UI/cpp/Geometry/Vertex.h"
 #include "UI/cpp/ModeHandlers/ModeHandlers.h"
 #include "UI/cpp/VulkanRenderNode.h"
 
@@ -99,6 +100,12 @@ void MainWindow::changeMode(Mode newMode)
             _modeController = std::make_shared<ModeHandlers::AddingLineMode>(this);
     }
 }
+
+void MainWindow::addingLineWithCoordinates(float x1, float y1, float x2, float y2)
+{
+    addLine(Geometry::Line{Geometry::Vertex{x1, y1, 0, 0, 0}, Geometry::Vertex{x2, y2, 0, 0, 0}});
+}
+
 
 void MainWindow::addLineMode()
 {
