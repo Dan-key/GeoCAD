@@ -1,7 +1,6 @@
 #include <cstddef>
 #include <exception>
 #include <memory>
-#include <qlogging.h>
 #include <qquickitem.h>
 #include <stdexcept>
 #include <vulkan/vulkan.h>
@@ -1073,6 +1072,11 @@ void VulkanRenderNode::drawNet(VkCommandBuffer commandBuffer)
     localZ = z;
     mvp.scale(localZ);
     mvp.translate((float)(pos.x()/itemSize.width())/localZ, (float)(pos.y()/itemSize.height())/localZ, 0);
+    if (itemSize.width() > itemSize.height()) {
+        mvp.scale(1, itemSize.width() / itemSize.height());
+    } else {
+        mvp.scale(itemSize.height() / itemSize.width(), 1);
+    }
     vkCmdPushConstants(
         commandBuffer,
         m_pipelineLineLayout,
