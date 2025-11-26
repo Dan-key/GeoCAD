@@ -41,6 +41,7 @@ public:
     enum class Mode {
         None,
         AddLine,
+        AddLineWithAngle,
     };
 
     Mode currentMode = Mode::None;
@@ -65,8 +66,11 @@ public slots:
     void keyPress(QKeyEvent* event, ViewportContext cntx);
 
     void addLineMode();
+    void addLineWithAngleMode();
     void addingLineWithCoordinates(float x1, float y1, float x2, float y2);
 
 private:
     std::shared_ptr<ModeHandlers::IModeHandler> _modeController;
+    std::shared_ptr<ModeHandlers::IModeHandler> _moveHandler;
+
 };

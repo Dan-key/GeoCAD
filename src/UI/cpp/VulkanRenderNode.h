@@ -16,6 +16,8 @@
 #include "Library/Vulkan/VulkanManager.h"
 #include "UI/cpp/MainWindow.h"
 
+class MainWindow;
+
 class VulkanRenderNode : public QSGRenderNode
 {
 public:

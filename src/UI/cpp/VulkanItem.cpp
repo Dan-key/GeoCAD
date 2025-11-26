@@ -76,12 +76,6 @@ void VulkanItem::hoverLeaveEvent(QHoverEvent *event)
 
 void VulkanItem::wheelEvent(QWheelEvent* event)
 {
-    float delta = event->angleDelta().ry();
-    if (delta > 0) {
-        VulkanRenderNode::z /= 0.9;
-    } else if (delta < 0 && VulkanRenderNode::z > 0.04) {
-        VulkanRenderNode::z *= 0.9;
-    }
     qDebug() << "VulkanItem::z" << VulkanRenderNode::z;
     emit wheel(event, ViewportContext{VulkanRenderNode::z, VulkanRenderNode::pos, size()});
     event->accept();

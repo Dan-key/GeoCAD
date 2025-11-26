@@ -4,13 +4,15 @@
 #include <memory>
 #include "UI/cpp/Geometry/Vertex.h"
 #include "UI/cpp/ModeHandlers/ModeHandlers.h"
+#include "UI/cpp/ModeHandlers/MoveHandler.h"
 #include "UI/cpp/VulkanRenderNode.h"
 
 
 MainWindow::MainWindow(QObject* parent) :
     QObject(parent),
     lines(Flux::MutableList<Geometry::Line>()),
-    _modeController(std::make_shared<ModeHandlers::IModeHandler>(this))
+    _modeController(nullptr),
+    _moveHandler(std::make_shared<ModeHandlers::MoveHandler>(this))
 {}
 
 void MainWindow::addLine(const Geometry::Line& line)
@@ -33,6 +35,7 @@ void MainWindow::mouseMove(QMouseEvent* event, ViewportContext cntx)
     if (_modeController) {
         _modeController->mouseMoveEvent(event, cntx);
     }
+    _moveHandler->mouseMoveEvent(event, cntx);
 }
 
 void MainWindow::mousePress(QMouseEvent* event, ViewportContext cntx)
@@ -40,6 +43,7 @@ void MainWindow::mousePress(QMouseEvent* event, ViewportContext cntx)
     if (_modeController) {
         _modeController->mousePressEvent(event, cntx);
     }
+    _moveHandler->mousePressEvent(event, cntx);
 }
 
 void MainWindow::mouseRelease(QMouseEvent* event, ViewportContext cntx)
@@ -47,6 +51,8 @@ void MainWindow::mouseRelease(QMouseEvent* event, ViewportContext cntx)
     if (_modeController) {
         _modeController->mouseReleaseEvent(event, cntx);
     }
+    _moveHandler->mouseReleaseEvent(event, cntx);
+
 }
 
 void MainWindow::hoverEnter(QHoverEvent* event, ViewportContext cntx)
@@ -54,6 +60,7 @@ void MainWindow::hoverEnter(QHoverEvent* event, ViewportContext cntx)
     if (_modeController) {
         _modeController->hoverEnterEvent(event, cntx);
     }
+    _moveHandler->hoverEnterEvent(event, cntx);
 }
 
 void MainWindow::hoverMove(QHoverEvent* event, ViewportContext cntx)
@@ -61,6 +68,7 @@ void MainWindow::hoverMove(QHoverEvent* event, ViewportContext cntx)
     if (_modeController) {
         _modeController->hoverMoveEvent(event, cntx);
     }
+    _moveHandler->hoverMoveEvent(event, cntx);
 }
 
 void MainWindow::hoverLeave(QHoverEvent* event, ViewportContext cntx)
@@ -68,6 +76,7 @@ void MainWindow::hoverLeave(QHoverEvent* event, ViewportContext cntx)
     if (_modeController) {
         _modeController->hoverLeaveEvent(event, cntx);
     }
+    _moveHandler->hoverLeaveEvent(event, cntx);
 }
 
 void MainWindow::wheel(QWheelEvent* event, ViewportContext cntx)
@@ -75,6 +84,7 @@ void MainWindow::wheel(QWheelEvent* event, ViewportContext cntx)
     if (_modeController) {
         _modeController->wheelEvent(event, cntx);
     }
+    _moveHandler->wheelEvent(event, cntx);
 }
 
 void MainWindow::keyPress(QKeyEvent* event, ViewportContext cntx)
@@ -82,6 +92,7 @@ void MainWindow::keyPress(QKeyEvent* event, ViewportContext cntx)
     if (_modeController) {
         _modeController->keyPressEvent(event, cntx);
     }
+    _moveHandler->keyPressEvent(event, cntx);
 }
 
 void MainWindow::changeMode(Mode newMode)
@@ -98,6 +109,13 @@ void MainWindow::changeMode(Mode newMode)
                 QGuiApplication::setOverrideCursor(QCursor(Qt::CrossCursor));
             }
             _modeController = std::make_shared<ModeHandlers::AddingLineMode>(this);
+            break;
+        case Mode::AddLineWithAngle:
+            if (!QGuiApplication::overrideCursor() || QGuiApplication::overrideCursor()->shape() != Qt::CrossCursor) {
+                QGuiApplication::setOverrideCursor(QCursor(Qt::CrossCursor));
+            }
+            _modeController = std::make_shared<ModeHandlers::AddingLineWithAngleMode>(this);
+            break;
     }
 }
 
@@ -111,3 +129,9 @@ void MainWindow::addLineMode()
 {
     changeMode(Mode::AddLine);
 }
+
+void MainWindow::addLineWithAngleMode()
+{
+    changeMode(Mode::AddLineWithAngle);
+}
+

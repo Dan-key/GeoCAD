@@ -33,9 +33,7 @@ void AddingLineMode::mousePressEvent(QMouseEvent *event, ViewportContext cntx)
             (((event->position().y() - pos.y() / 2) * 2 / (itemSize.height()) - 1) / z)
         );
         qDebug() << "addLineStart" << addLineStart << "eventposition" << event->position();
-        // isSecondPoint = true;
     }
-    IModeHandler::mousePressEvent(event, cntx);
 }
 
 void AddingLineMode::mouseMoveEvent(QMouseEvent *event, ViewportContext cntx)
@@ -60,16 +58,12 @@ void AddingLineMode::mouseMoveEvent(QMouseEvent *event, ViewportContext cntx)
             _controller->addLine(line);
         }
     }
-    IModeHandler::mouseMoveEvent(event, cntx);
 }
 
 void AddingLineMode::mouseReleaseEvent(QMouseEvent *event, ViewportContext cntx)
 {
     m_mouseLinePressed = false;
     QPointF localPos = event->position();
-
-    beginPos = {0.0, 0.0};
-    deltaPos = {0.0, 0.0};
 
     if (isSecondPoint) {
         auto itemSize = cntx.viewportSize;
@@ -92,7 +86,6 @@ void AddingLineMode::mouseReleaseEvent(QMouseEvent *event, ViewportContext cntx)
     } else {
         isSecondPoint = true;
     }
-    IModeHandler::mouseReleaseEvent(event, cntx);
 }
 
 } // namespace ModeHandlers

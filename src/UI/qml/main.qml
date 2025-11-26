@@ -65,8 +65,7 @@ ApplicationWindow {
                 GeoButton {
                     text: "addLine"
                     onClicked: {
-                        mainWindow.addLine();
-                        vulkanItem.addingLine();
+                        mainWindow.addLineWithAngleMode();
                     }
                 }
             }
