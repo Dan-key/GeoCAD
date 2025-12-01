@@ -10,12 +10,16 @@ template<typename T>
 class Mutable
 {
 public:
-    Mutable() : _v(std::make_shared<T>()) {}
-    Mutable(const T& value) : _v(std::make_shared<T>(value)) {}
-    Mutable(const Mutable<T>& other) : _v(other._v) {}
-    Mutable<T>& operator=(const Mutable<T>& other) {
+    Mutable()
+    : _v(std::make_shared<T>()),
+      _observers((std::make_shared<std::vector<std::function<void(const T &)>>>()))
+    {}
+
+    Mutable(const T &value) : _v(std::make_shared<T>(value)) {}
+    Mutable(const Mutable<T> &other) : _v(other._v) {}
+    Mutable<T> &operator=(const Mutable<T> &other) {
         if (this != &other) {
-            _v = other._v;
+        _v = other._v;
         }
         return *this;
     }
@@ -40,7 +44,7 @@ public:
     }
 private:
     std::shared_ptr<T> _v;
-    std::vector<std::function<void(const T&)>> _observers;
+    std::shared_ptr<std::vector<std::function<void(const T&)>>> _observers;
 };
 
 } // namespace Flux

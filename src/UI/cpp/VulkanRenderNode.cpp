@@ -917,18 +917,6 @@ void VulkanRenderNode::updateVertexBuffer()
 
 void VulkanRenderNode::updateVertexAddedLinesBuffer(const Geometry::Line& line, size_t index)
 {
-    // if (m_vertexAddedLinesBuffer == VK_NULL_HANDLE)
-    //     return;
-
-    // void* data;
-
-    // VkResult result = _vkManager->devFuncs()->vkMapMemory(_vkManager->device(), m_vertexAddedLinesBufferMemory, (m_verticesAddedLines.size() - 1)*sizeof(m_verticesAddedLines[0]), 
-    //                                          sizeof(Geometry::Line) * m_verticesAddedLines.size(), 0, &data);
-    // if (result == VK_SUCCESS) {
-    //     memcpy(data, &m_verticesAddedLines[m_verticesAddedLines.size() -1], sizeof(Geometry::Line));
-    //     _vkManager->devFuncs()->vkUnmapMemory(_vkManager->device(), m_vertexAddedLinesBufferMemory);
-    //     m_verticesAddedLinesDirty = false;
-    // }
     decltype(m_verticesAddedLines)::value_type* data = new decltype(m_verticesAddedLines)::value_type;
     *data = m_verticesAddedLines.at(index);
     bufferAddedLines.updateMemory(index * sizeof(decltype(m_verticesAddedLines)::value_type), data, sizeof(decltype(m_verticesAddedLines)::value_type));

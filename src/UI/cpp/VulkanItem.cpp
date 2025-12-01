@@ -76,12 +76,10 @@ void VulkanItem::hoverLeaveEvent(QHoverEvent *event)
 
 void VulkanItem::wheelEvent(QWheelEvent* event)
 {
-    qDebug() << "VulkanItem::z" << VulkanRenderNode::z;
     emit wheel(event, ViewportContext{VulkanRenderNode::z, VulkanRenderNode::pos, size()});
     event->accept();
 }
 
-// VulkanItem Implementation
 VulkanItem::VulkanItem(QQuickItem *parent)
     : QQuickItem(parent)
 {
